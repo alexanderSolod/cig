@@ -1,4 +1,4 @@
-// The stats screen: session / today / all-time numbers, a 14-day chart, recent sessions,
+// The stats screen, laid out like the back of the current brand's pack: session / today / all-time numbers, a 14-day chart, recent sessions,
 // a tar calculator and the brand picker. Plain DOM so it works in a page or a shadow root.
 import { BRANDS, brand as getBrand } from './brands.js';
 import { PACK_SIZE, dayKey } from './stats.js';
@@ -8,69 +8,74 @@ const PX_TO_M = 0.0254 / 96;          // CSS px are 1/96 inch
 const JAR_G = 250;                    // the tar jar holds about a cup
 
 const CSS = `
-.cp-scrim { position: fixed; inset: 0; z-index: 2147483647; display: flex; align-items: center; justify-content: center;
-  background: rgba(4,4,6,.62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; transition: opacity .2s ease;
-  font: 400 13px/1.35 ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif; color: rgba(255,255,255,.86); }
-.cp-scrim.on { opacity: 1; }
-.cp-scrim[hidden] { display: none; }
-.cp-card { width: min(760px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; box-sizing: border-box;
-  background: linear-gradient(180deg, #17161a, #0d0d10); border: 1px solid rgba(255,255,255,.09); border-radius: 18px;
-  box-shadow: 0 30px 80px rgba(0,0,0,.6); padding: 18px 20px 16px; transform: translateY(8px) scale(.985); transition: transform .2s ease; }
-.cp-scrim.on .cp-card { transform: none; }
-.cp-card * { box-sizing: border-box; }
-.cp-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.cp-title { font-weight: 700; font-size: 17px; letter-spacing: .02em; color: #fff; }
-.cp-title span { color: rgba(255,160,90,.9); font-weight: 500; }
-.cp-tabs { display: flex; gap: 4px; margin-left: auto; background: rgba(255,255,255,.05); padding: 3px; border-radius: 999px; }
-.cp-btn { font: inherit; color: rgba(255,255,255,.7); background: transparent; border: 0; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
-.cp-btn:hover { color: #fff; background: rgba(255,255,255,.07); }
-.cp-btn.on { color: #fff; background: rgba(255,140,60,.25); }
-.cp-x { font-size: 18px; line-height: 1; padding: 6px 10px; }
-.cp-label { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.45); }
-.cp-brands { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; }
-.cp-brand { font: inherit; color: inherit; text-align: left; cursor: pointer; border-radius: 12px; padding: 8px; border: 1px solid rgba(255,255,255,.08);
-  background: rgba(255,255,255,.03); display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: center; }
-.cp-brand:hover { background: rgba(255,255,255,.07); }
-.cp-brand.on { border-color: rgba(255,150,80,.65); background: rgba(255,140,60,.12); }
-.cp-sw { width: 22px; height: 34px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); position: relative; overflow: hidden; }
-.cp-sw i { position: absolute; left: 0; right: 0; top: 0; height: 30%; border-bottom: 1px solid rgba(0,0,0,.35); }
-.cp-sw b { position: absolute; left: 3px; right: 3px; bottom: 3px; height: 7px; background: #fff; border-radius: 1px; }
-.cp-bn { font-weight: 600; font-size: 12px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cp-bl { font-size: 11px; color: rgba(255,255,255,.5); }
-.cp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.cp-tile { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 10px 12px; min-width: 0; }
-.cp-big { font-size: 26px; font-weight: 700; color: #fff; letter-spacing: -.01em; font-variant-numeric: tabular-nums; margin-top: 2px; }
-.cp-sub { font-size: 11.5px; color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cp-mini { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 8px; }
-.cp-mini .cp-big { font-size: 16px; }
-.cp-row { display: grid; grid-template-columns: 1.05fr 1fr; gap: 10px; margin-top: 12px; }
-.cp-box { background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.06); border-radius: 14px; padding: 12px; min-width: 0; }
-.cp-box h3 { margin: 0 0 10px; font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.7); }
-.cp-in { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
-.cp-in label { display: grid; gap: 4px; }
-.cp-in input { font: inherit; color: #fff; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 6px 8px; width: 100%; }
-.cp-in input:focus { outline: 1px solid rgba(255,170,110,.8); }
-.cp-calc { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; }
-.cp-res { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
-.cp-res div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dashed rgba(255,255,255,.08); padding-bottom: 3px; }
-.cp-res b { color: #fff; font-variant-numeric: tabular-nums; }
-.cp-note { margin-top: 8px; font-size: 11px; color: rgba(255,255,255,.42); }
-.cp-bars { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; align-items: end; height: 92px; margin-bottom: 4px; }
-.cp-bar { background: rgba(255,255,255,.14); border-radius: 3px 3px 1px 1px; min-height: 2px; position: relative; }
-.cp-bar.today { background: linear-gradient(180deg, #ffb070, #ff6a2a); }
-.cp-bar span { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); font-size: 9.5px; color: rgba(255,255,255,.6); padding-bottom: 2px; }
-.cp-days { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; font-size: 9.5px; color: rgba(255,255,255,.35); text-align: center; margin-bottom: 10px; }
-.cp-sess { display: grid; gap: 4px; }
-.cp-sess div { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; font-size: 12px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
-.cp-sess em { font-style: normal; color: rgba(255,255,255,.5); }
-.cp-foot { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
-.cp-split { display: flex; flex: 1; height: 8px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,.06); }
-.cp-split i { display: block; height: 100%; }
-.cp-reset { color: rgba(255,120,100,.8); }
-@media (max-width: 640px) {
-  .cp-brands { grid-template-columns: repeat(3, 1fr); } .cp-grid { grid-template-columns: repeat(2, 1fr); }
-  .cp-mini { grid-template-columns: repeat(3, 1fr); } .cp-row { grid-template-columns: 1fr; }
-}
+.cp-scrim{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:18px;
+  background:rgba(8,7,6,.62);opacity:0;transition:opacity .18s ease}
+.cp-scrim.on{opacity:1}
+.cp-scrim[hidden]{display:none}
+.cp-card{--bg:#222;--bg2:#111;--ink:#eee;--acc:#c9a24a;--word:Georgia,serif;
+  width:min(780px,100%);max-height:calc(100vh - 36px);overflow:auto;border-radius:3px;color:var(--ink);
+  font:13px/1.35 "Helvetica Neue",Helvetica,Arial,sans-serif;font-variant-numeric:tabular-nums;
+  background:linear-gradient(180deg,var(--bg),var(--bg2));box-shadow:0 30px 80px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.08);
+  transform:translateY(10px);transition:transform .2s ease;scrollbar-width:thin}
+.cp-scrim.on .cp-card{transform:none}
+.cp-card button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+.cp-lid{display:flex;align-items:center;gap:18px;padding:12px 22px 11px;border-bottom:1px solid rgba(0,0,0,.45);
+  box-shadow:0 1px 0 rgba(255,255,255,.12);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.cp-tabs{display:flex;gap:16px;flex:1}
+.cp-tabs button{opacity:.55;padding-bottom:2px;border-bottom:1.5px solid transparent;letter-spacing:inherit;text-transform:inherit}
+.cp-tabs button.on{opacity:1;border-color:currentColor}
+.cp-x{opacity:.7}.cp-x:hover,.cp-tabs button:hover{opacity:1}
+.cp-body{padding:18px 22px 20px}
+.cp-mast{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px}
+.cp-word{font:600 30px/1 var(--word);letter-spacing:.01em}
+.cp-count{font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.75;white-space:nowrap}
+.cp-warn{background:#fff;color:#000;border:6px solid #000;outline:8px solid #fff;margin:8px 8px 22px;padding:16px 18px;
+  font:700 21px/1.22 "Helvetica Neue",Helvetica,Arial,sans-serif;text-align:center;text-wrap:balance}
+.cp-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:660px){.cp-cols{grid-template-columns:1fr}}
+.cp-panel{background:#fbfaf6;color:#151515;padding:12px 14px 13px;border-radius:1px}
+.cp-panel+.cp-panel{margin-top:14px}
+.cp-panel h3{margin:0 0 8px;font:700 10.5px/1 "Helvetica Neue",Arial,sans-serif;letter-spacing:.16em;text-transform:uppercase;
+  padding-bottom:6px;border-bottom:2px solid #151515}
+.cp-tbl{width:100%;border-collapse:collapse}
+.cp-tbl td{padding:4px 0;border-bottom:1px solid #d9d6cc;vertical-align:baseline}
+.cp-tbl tr:last-child td{border-bottom:0}
+.cp-tbl td:nth-child(2){text-align:right;font-weight:700;white-space:nowrap;padding-left:10px}
+.cp-tbl small{display:block;color:#6d6a62;font-size:11px}
+.cp-tbl tr.hi td{font-size:15px}
+.cp-in{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
+.cp-in label{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#6d6a62}
+.cp-in input{display:block;width:100%;box-sizing:border-box;margin-top:3px;border:0;border-bottom:1.5px solid #151515;background:none;
+  font:700 17px "Helvetica Neue",Arial,sans-serif;color:#151515;padding:2px 0;outline:0}
+.cp-in input:focus{border-color:#b3261e}
+.cp-calc{display:flex;gap:12px;align-items:flex-start}
+.cp-jar{flex:none}
+.cp-res{flex:1}
+.cp-note{margin-top:8px;font-size:10.5px;color:#6d6a62}
+.cp-bars{display:flex;align-items:flex-end;gap:3px;height:70px;padding-top:14px;border-bottom:1.5px solid #151515}
+.cp-bar{flex:1;background:#151515;min-height:1px;position:relative}
+.cp-bar.today{background:#b3261e}
+.cp-bar span{position:absolute;bottom:100%;left:0;right:0;text-align:center;font-size:9px;margin-bottom:2px}
+.cp-days{display:flex;gap:3px;font-size:9px;color:#6d6a62;margin-top:3px}.cp-days div{flex:1;text-align:center}
+.cp-sess div{display:flex;gap:8px;padding:4px 0;border-bottom:1px solid #d9d6cc;align-items:baseline}
+.cp-sess div:last-child{border-bottom:0}
+.cp-sess span{flex:1}.cp-sess em{color:#6d6a62;font-style:normal;font-size:11px}
+.cp-brands{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cp-brand{display:flex;flex-direction:column;align-items:center;gap:5px;padding:4px 2px 6px;text-align:center;border:1.5px solid transparent;border-radius:2px}
+.cp-brand.on{border-color:#151515}
+.cp-brand:hover{background:rgba(0,0,0,.04)}
+.cp-sw{width:30px;height:44px;border-radius:1.5px;position:relative;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+.cp-sw i{position:absolute;left:0;right:0;top:0;height:30%}
+.cp-sw b{position:absolute;left:4px;right:4px;bottom:4px;height:22%;background:#fff;outline:1.5px solid #000;outline-offset:-2px}
+.cp-bn{font-size:11px;font-weight:700;line-height:1.15}
+.cp-bl{font-size:10px;color:#6d6a62}
+.cp-split{display:flex;height:6px;margin-top:10px;background:#e7e4da}
+.cp-foot{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:end;margin-top:20px}
+.cp-code{background:#fff;padding:6px 8px 3px;color:#000;font-size:9px;letter-spacing:.2em;text-align:center}
+.cp-code svg{display:block}
+.cp-fine{font-size:10px;line-height:1.45;opacity:.72}
+.cp-stamp{border:1.5px solid currentColor;padding:5px 8px;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;text-align:center;line-height:1.3;opacity:.85}
+.cp-reset{text-decoration:underline;opacity:.8}
 `;
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -94,10 +99,10 @@ function jar(fill) {
   return `<svg viewBox="0 0 64 96" width="64" height="96" aria-hidden="true">
     <defs><clipPath id="cpjar"><path d="M12 14h40v6c6 3 8 8 8 14v52a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6V34c0-6 2-11 8-14z"/></clipPath>
     <linearGradient id="cptar" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#5a3a1c"/><stop offset="1" stop-color="#140b05"/></linearGradient></defs>
-    <g clip-path="url(#cpjar)"><rect x="0" y="0" width="64" height="96" fill="rgba(255,255,255,.05)"/>
+    <g clip-path="url(#cpjar)"><rect x="0" y="0" width="64" height="96" fill="rgba(0,0,0,.04)"/>
     <rect x="0" y="${y.toFixed(1)}" width="64" height="96" fill="url(#cptar)"/>
-    <rect x="9" y="26" width="5" height="54" rx="2.5" fill="rgba(255,255,255,.12)"/></g>
-    <path d="M12 14h40v6c6 3 8 8 8 14v52a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6V34c0-6 2-11 8-14z" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1.5"/>
+    <rect x="9" y="26" width="5" height="54" rx="2.5" fill="rgba(255,255,255,.18)"/></g>
+    <path d="M12 14h40v6c6 3 8 8 8 14v52a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6V34c0-6 2-11 8-14z" fill="none" stroke="#151515" stroke-width="1.5"/>
     <rect x="10" y="6" width="44" height="9" rx="2" fill="#6b6b72"/></svg>`;
 }
 
@@ -109,31 +114,37 @@ export function createPanel(root, tracker, { onBrand } = {}) {
   const scrim = document.createElement('div');
   scrim.className = 'cp-scrim'; scrim.hidden = true;
   scrim.innerHTML = `<div class="cp-card" role="dialog" aria-modal="true" aria-label="Smoking stats">
-    <div class="cp-head"><div class="cp-title">cig <span>ledger</span></div>
-      <div class="cp-tabs" role="tablist">
-        <button class="cp-btn" data-tab="session" role="tab">Session</button>
-        <button class="cp-btn" data-tab="today" role="tab">Today</button>
-        <button class="cp-btn" data-tab="total" role="tab">All time</button>
-      </div>
-      <button class="cp-btn cp-x" title="Close (Esc)" aria-label="Close">×</button></div>
-    <div class="cp-brands"></div>
-    <div class="cp-grid"></div>
-    <div class="cp-mini"></div>
-    <div class="cp-row">
-      <div class="cp-box"><h3>Tar calculator</h3>
-        <div class="cp-in">
-          <label><span class="cp-label">Cigs / day</span><input type="number" min="0" max="200" step="1" data-k="perDay"></label>
-          <label><span class="cp-label">Years</span><input type="number" min="0" max="80" step="1" data-k="years"></label>
-          <label><span class="cp-label">$ / pack</span><input type="number" min="0" max="100" step="0.5" data-k="price"></label>
+    <div class="cp-lid"><div class="cp-tabs" role="tablist">
+        <button data-tab="session" role="tab">This session</button>
+        <button data-tab="today" role="tab">Today</button>
+        <button data-tab="total" role="tab">All time</button>
+      </div><button class="cp-x" title="Close (Esc)">Close</button></div>
+    <div class="cp-body">
+      <div class="cp-mast"><div class="cp-word"></div><div class="cp-count"></div></div>
+      <div class="cp-warn" role="status"></div>
+      <div class="cp-cols">
+        <div>
+          <section class="cp-panel"><h3>Contents</h3><table class="cp-tbl"></table></section>
+          <section class="cp-panel"><h3>Tar calculator</h3>
+            <div class="cp-in">
+              <label>Cigs a day<input type="number" min="0" max="200" step="1" data-k="perDay"></label>
+              <label>Years<input type="number" min="0" max="80" step="1" data-k="years"></label>
+              <label>$ a pack<input type="number" min="0" max="100" step="0.5" data-k="price"></label>
+            </div>
+            <div class="cp-calc"><div class="cp-jar"></div><table class="cp-tbl cp-res"></table></div>
+            <div class="cp-note"></div></section>
         </div>
-        <div class="cp-calc"><div class="cp-jar"></div><div class="cp-res"></div></div>
-        <div class="cp-note"></div>
+        <div>
+          <section class="cp-panel"><h3>Last 14 days</h3><div class="cp-bars"></div><div class="cp-days"></div></section>
+          <section class="cp-panel"><h3>Recent sessions</h3><div class="cp-sess"></div></section>
+          <section class="cp-panel"><h3>Brand</h3><div class="cp-brands"></div><div class="cp-split"></div></section>
+        </div>
       </div>
-      <div class="cp-box"><h3>Last 14 days</h3><div class="cp-bars"></div><div class="cp-days"></div>
-        <h3>Recent sessions</h3><div class="cp-sess"></div></div>
+      <div class="cp-foot"><div class="cp-code"></div>
+        <div class="cp-fine">Made by your thumb under licence from the feed. Figures are estimates from brand averages; life cost uses a rough 20 minutes per cigarette and is not medical advice.
+          <button class="cp-reset" title="Wipe all stats">Reset ledger</button></div>
+        <div class="cp-stamp"></div></div>
     </div>
-    <div class="cp-foot"><span class="cp-label">By brand</span><div class="cp-split"></div>
-      <button class="cp-btn cp-reset" title="Wipe all stats">Reset</button></div>
   </div>`;
   (root instanceof ShadowRoot ? root : document.body).appendChild(scrim);
 
@@ -186,26 +197,44 @@ export function createPanel(root, tracker, { onBrand } = {}) {
     }));
   }
 
+  const WORD = { roof: 'Georgia, "Times New Roman", serif', wave: '"Helvetica Neue", Arial, sans-serif', stars: '"Times New Roman", Times, serif',
+    arc: 'Optima, Candara, "Gill Sans", sans-serif', devil: '"Chalkduster", "Marker Felt", fantasy', kretek: 'Georgia, serif' };
+  const WHEN = { session: 'This session', today: 'Today', total: 'Since you started' };
+
+  function barcode(seed) {
+    let x = 0, out = '', r = seed >>> 0 || 7;
+    for (let i = 0; i < 46; i++) { r = (r * 1103515245 + 12345) >>> 0; const w = 1 + (r >>> 29) % 3; if (i % 2 === 0) out += `<rect x="${x}" y="0" width="${w}" height="34"/>`; x += w; }
+    return `<svg viewBox="0 0 ${x} 34" width="${x * 1.4}" height="34" aria-hidden="true">${out}</svg>`;
+  }
+
   function renderNumbers(snap) {
-    const s = snap[tab], now = Date.now();
+    const s = snap[tab], now = Date.now(), b = getBrand(snap.brand);
     const span = tab === 'session' ? now - s.start : null;
     const pace = s.activeMs > 60e3 ? (s.cigs / (s.activeMs / 3.6e6)) : null;
-    const tile = (label, big, sub) => `<div class="cp-tile"><div class="cp-label">${label}</div><div class="cp-big">${big}</div><div class="cp-sub">${sub}</div></div>`;
     const m = s.scrollPx * PX_TO_M;
-    $('.cp-grid').innerHTML = [
-      tile('Cigarettes', s.cigs, `${s.smoked.toFixed(1)} actually burnt`),
-      tile('Packs', fmtPacks(s.cigs), `${s.packs} opened · ${tracker.left()} left in this one`),
-      tile('Drags', s.drags, s.cigs ? `${(s.drags / s.cigs).toFixed(1)} per cigarette` : 'scroll to drag'),
-      tile('Time scrolling', fmtDur(s.activeMs), span != null ? `session open ${fmtDur(span)}` : tab === 'today' ? 'today' : 'all time'),
-      tile('Scrolled', fmtDist(s.scrollPx), m > 33 ? `${(m / 330).toFixed(2)} Eiffel Towers` : `${Math.round(m * 100 / 1.75)}% of you, lying down`),
-      tile('Tar', fmtMg(s.tar), `${((s.tar / 1000) / JAR_G * 100).toFixed(2)}% of a jar`),
+    const card = $('.cp-card');
+    card.style.setProperty('--bg', b.pack.bg); card.style.setProperty('--bg2', b.pack.bg2 || b.pack.bg);
+    card.style.setProperty('--ink', b.pack.ink); card.style.setProperty('--word', WORD[b.pack.style] || WORD.roof);
+    $('.cp-word').textContent = b.name;
+    $('.cp-count').textContent = `${tracker.left()} of ${PACK_SIZE} cigarettes left`;
+    $('.cp-warn').innerHTML = `${WHEN[tab]} you smoked ${s.cigs} cigarette${s.cigs === 1 ? '' : 's'} (${fmtPacks(s.cigs)} pack${s.cigs === PACK_SIZE ? '' : 's'}) in ${fmtDur(s.activeMs)} of scrolling`;
+    const row = (k, v, note, hi) => `<tr${hi ? ' class="hi"' : ''}><td>${k}${note ? `<small>${note}</small>` : ''}</td><td>${v}</td></tr>`;
+    $('.cp-tbl').innerHTML = [
+      row('Cigarettes', s.cigs, `${s.smoked.toFixed(1)} actually burnt`, 1),
+      row('Packs', fmtPacks(s.cigs), `${s.packs} opened`, 1),
+      row('Tar', fmtMg(s.tar), `${((s.tar / 1000) / JAR_G * 100).toFixed(2)}% of a jar`, 1),
+      row('Nicotine', fmtMg(s.nic)), row('Carbon monoxide', fmtMg(s.co)),
+      row('Drags', s.drags, s.cigs ? `${(s.drags / s.cigs).toFixed(1)} per cigarette` : ''),
+      row('Capsules popped', s.pops),
+      row('Time scrolling', fmtDur(s.activeMs), span != null ? `session open ${fmtDur(span)}` : ''),
+      row('Distance scrolled', fmtDist(s.scrollPx), m > 33 ? `${(m / 330).toFixed(2)} Eiffel Towers` : `${Math.round(m * 100 / 1.75)}% of your height`),
+      row('Pace', pace == null ? '—' : `${pace.toFixed(1)} an hour`),
+      row('Spent', fmtMoney((s.cigs / PACK_SIZE) * (snap.settings.price || 0))),
+      row('Life, est.', fmtLife(s.smoked * LIFE_MIN_PER_CIG)),
     ].join('');
-    const mini = (label, big) => `<div class="cp-tile"><div class="cp-label">${label}</div><div class="cp-big">${big}</div></div>`;
-    $('.cp-mini').innerHTML = [
-      mini('Nicotine', fmtMg(s.nic)), mini('CO', fmtMg(s.co)), mini('Capsules', s.pops),
-      mini('Life, est.', fmtLife(s.smoked * LIFE_MIN_PER_CIG)), mini('Spent', fmtMoney((s.cigs / PACK_SIZE) * (snap.settings.price || 0))),
-      mini('Pace', pace == null ? '—' : `${pace.toFixed(1)}/h`),
-    ].join('');
+    const lot = `${dayKey(s.start).replace(/-/g, '')}${String(snap.total.cigs).padStart(4, '0')}`;
+    $('.cp-code').innerHTML = `${barcode(snap.total.cigs * 31 + snap.total.packs + 5)}${lot}`;
+    $('.cp-stamp').innerHTML = `Scroll duty paid<br>${b.tar} mg tar · ${b.nic} mg nic · ${b.co} mg CO`;
   }
 
   function renderHistory(snap) {
@@ -244,7 +273,7 @@ export function createPanel(root, tracker, { onBrand } = {}) {
     const cigs = calc.perDay * 365.25 * calc.years;
     const tarG = (cigs * mix.tar) / 1000;
     $('.cp-jar').innerHTML = jar(tarG / JAR_G);
-    const r = (k, v) => `<div><span>${k}</span><b>${v}</b></div>`;
+    const r = (k, v) => `<tr><td>${k}</td><td>${v}</td></tr>`;
     $('.cp-res').innerHTML = [
       r('Cigarettes', Math.round(cigs).toLocaleString()), r('Packs', Math.round(cigs / PACK_SIZE).toLocaleString()),
       r('Tar', `${tarG.toFixed(tarG < 10 ? 1 : 0)} g`), r('Tar jars', (tarG / JAR_G).toFixed(2)),
@@ -257,20 +286,21 @@ export function createPanel(root, tracker, { onBrand } = {}) {
 
   function render(full = false) {
     const snap = tracker.snapshot();
-    $$('[data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+    $$('[data-tab]').forEach((b) => { b.classList.toggle('on', b.dataset.tab === tab); b.setAttribute('aria-selected', b.dataset.tab === tab); });
     renderBrands(snap); renderNumbers(snap); renderHistory(snap);
     if (full) renderCalc(true);
   }
 
   function open() {
-    if (!scrim.hidden) return;
+    if (scrim.classList.contains('on')) return;
+    clearInterval(timer);
     scrim.hidden = false; calc.perDay = null;
     render(true);
     requestAnimationFrame(() => scrim.classList.add('on'));
     timer = setInterval(() => render(false), 1000);
   }
   function close() {
-    if (scrim.hidden) return;
+    if (!scrim.classList.contains('on')) return;
     clearInterval(timer);
     scrim.classList.remove('on');
     setTimeout(() => { if (!scrim.classList.contains('on')) scrim.hidden = true; }, 200);
