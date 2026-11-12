@@ -1,0 +1,40 @@
+<!doctype html>
+<!-- Dev only: the overlay on top of a stand-in for X's layout, tall enough to scroll. Add ?light for a white page. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cig · overlay mock</title>
+<style>
+  :root { --bg: #000; --line: #2f3336; --block: #16181c; --text: #71767b; }
+  body.light { --bg: #fff; --line: #eff3f4; --block: #f7f9f9; --text: #8b98a5; }
+  html, body { margin: 0; background: var(--bg); font: 14px/1.4 system-ui, sans-serif; color: var(--text); }
+  .page { display: grid; grid-template-columns: 1fr minmax(0, 600px) 350px 1fr; min-height: 100vh; }
+  .feed { grid-column: 2; border-inline: 1px solid var(--line); }
+  .post { padding: 16px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 40px 1fr; gap: 12px; }
+  .post i { width: 40px; height: 40px; border-radius: 50%; background: var(--block); }
+  .post b { display: block; height: 12px; border-radius: 6px; background: var(--block); margin: 4px 0 10px; }
+  .post u { display: block; border-radius: 16px; background: var(--block); }
+  /* stands in for X's right column so the overlay can find it */
+  [data-testid="sidebarColumn"] { grid-column: 3; position: sticky; top: 0; height: 100vh; box-sizing: border-box; padding: 12px 24px; }
+  [data-testid="sidebarColumn"] div { height: 180px; border: 1px solid var(--line); border-radius: 16px; margin-bottom: 16px; }
+  @media (max-width: 1000px) { .page { grid-template-columns: 0 1fr 0 0; } [data-testid="sidebarColumn"] { display: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="feed" id="feed"></div>
+  <div data-testid="sidebarColumn"><div></div><div></div><div></div></div>
+</div>
+<script type="module">
+  if (location.search.includes('light')) document.body.classList.add('light');
+  const feed = document.getElementById('feed');
+  for (let n = 0; n < 60; n++) {
+    const media = n % 3 === 0 ? `<u style="height:${180 + (n * 37) % 160}px"></u>` : '';
+    feed.insertAdjacentHTML('beforeend',
+      `<div class="post"><i></i><div><b style="width:${30 + (n * 17) % 30}%"></b><b style="width:${60 + (n * 29) % 35}%"></b><b style="width:${40 + (n * 13) % 45}%"></b>${media}</div></div>`);
+  }
+  import('../src/overlay.js').then((m) => m.mount());
+</script>
+</body>
+</html>
