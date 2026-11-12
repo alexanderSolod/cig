@@ -26,24 +26,34 @@ export const BRANDS = [
     pack: { bg: '#0f8a73', bg2: '#5fd6b8', ink: '#ffffff', accent: '#d8fff4', accent2: '#0a4d42', style: 'wave' },
   },
   {
-    id: 'sevenstars', name: 'Seven Stars', short: '7 Stars', blurb: 'Charcoal filter, a ring of seven stars.',
+    id: 'sevenstars', name: 'Seven Stars', short: '7 Stars', blurb: 'The first charcoal filter. Silver stars on white.',
     tar: 14, nic: 1.2, co: 13,
     look: {
       paper: [0.95, 0.95, 0.94], tipA: [0.95, 0.95, 0.95], tipB: [0.98, 0.98, 0.98], cork: 0.1,
-      band: C('#7f8fa8'), bandMetal: 1, bands: [0, 1], filter: [0.86, 0.86, 0.85], charcoal: 1,
-      stars: 1, print: C('#1c2f66'), tobacco: [1, 1, 1],
+      band: C('#8f97ab'), bandMetal: 1, bands: [0, 1], filter: [0.86, 0.86, 0.85], charcoal: 1,
+      stars: 1, print: C('#1c2250'), tobacco: [1, 1, 1],
     },
-    pack: { bg: '#1a2a5c', bg2: '#0e1736', ink: '#ffffff', accent: '#c8ced9', accent2: '#e9eef7', style: 'stars' },
+    pack: { bg: '#f4f4f1', bg2: '#dcdcd8', ink: '#141414', accent: '#a9abb0', accent2: '#c2a35c', tab: '#1c2250', style: 'stars' },
   },
   {
-    id: 'blackdevil', name: 'Black Devil', short: 'Devil', blurb: 'Black paper, black tip, sweet smoke.',
-    tar: 9, nic: 0.7, co: 9, smoke: { tint: [0.62, 0.52, 0.56], amount: 0.18 },
+    id: 'mevius', name: 'Mevius Original', short: 'Mevius', blurb: 'Formerly Mild Seven. Gold arc on navy.',
+    tar: 10, nic: 0.8, co: 9,
+    look: {
+      paper: [0.95, 0.95, 0.95], tipA: [0.94, 0.94, 0.94], tipB: [0.98, 0.98, 0.98], cork: 0.05,
+      band: C('#2b3a9e'), bandMetal: 0.35, bands: [0, 1], filter: [0.92, 0.92, 0.92], charcoal: 1,
+      stars: 0, print: C('#2b3a9e'), tobacco: [1, 1, 1],
+    },
+    pack: { bg: '#232a86', bg2: '#0c0f3d', ink: '#d9b25a', accent: '#f4efe3', accent2: '#7d88e0', style: 'arc' },
+  },
+  {
+    id: 'blackdevil', name: 'Black Devil', short: 'Devil', blurb: 'Matte black paper, gold ring, sweet smoke.',
+    tar: 7, nic: 0.5, co: 10, smoke: { tint: [0.62, 0.55, 0.52], amount: 0.16 },
     look: {
       paper: [0.035, 0.033, 0.035], tipA: [0.03, 0.03, 0.032], tipB: [0.07, 0.065, 0.07], cork: 0.25,
-      band: [0.85, 0.18, 0.42], bandMetal: 0.6, bands: [1, 0], filter: [0.10, 0.10, 0.10], charcoal: 0,
-      stars: 0, print: [0, 0, 0], tobacco: [0.9, 0.8, 0.8],
+      band: C('#d1a64e'), bandMetal: 1, bands: [1, 0], filter: [0.10, 0.10, 0.10], charcoal: 0,
+      stars: 0, print: C('#c9a24a'), tobacco: [0.9, 0.8, 0.8],
     },
-    pack: { bg: '#0b0b0c', bg2: '#1c1c20', ink: '#f2f2f2', accent: '#e0306e', accent2: '#8a8a90', style: 'devil' },
+    pack: { bg: '#0a0a0a', bg2: '#1b1b1d', ink: '#cfd0d2', accent: '#d42a2f', accent2: '#c9a24a', style: 'devil' },
   },
   {
     id: 'kretek', name: 'Kretek Clove', short: 'Kretek', blurb: 'Brown paper, clove that crackles.',

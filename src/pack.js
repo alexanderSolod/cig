@@ -107,34 +107,71 @@ const ART = {
   },
   stars(g, w, h, b) {
     const p = b.pack;
-    g.strokeStyle = p.accent; g.lineWidth = 3; g.strokeRect(22, 22, w - 44, 520);
-    const gr = g.createLinearGradient(0, 200, 0, 420);
-    gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, p.accent);
-    g.fillStyle = gr; star(g, w / 2, 300, 104, -Math.PI / 2, 0.4); g.fill();
-    g.fillStyle = p.bg; star(g, w / 2, 304, 40, -Math.PI / 2, 0.4); g.fill();
-    g.fillStyle = p.accent;
-    for (let i = 0; i < 7; i++) { star(g, w / 2 + (i - 3) * 34, 140, 11); g.fill(); }
+    // a field of small silver stars, the ones inside a big "7" printed gold
+    const seven = new Path2D();
+    seven.moveTo(120, 96); seven.lineTo(400, 96); seven.lineTo(400, 150);
+    seven.lineTo(268, 540); seven.lineTo(196, 540); seven.lineTo(318, 160); seven.lineTo(120, 160); seven.closePath();
+    for (let y = 92, r = 0; y < 560; y += 21, r++) {
+      for (let x = 14 + (r % 2) * 10.5; x < w; x += 21) {
+        const in7 = g.isPointInPath(seven, x, y);
+        g.fillStyle = in7 ? p.accent2 : p.accent; g.globalAlpha = in7 ? 0.75 : 0.55;
+        star(g, x, y, in7 ? 6 : 4.6); g.fill();
+      }
+    }
+    g.globalAlpha = 1;
+    g.fillStyle = p.tab; g.fillRect(150, 0, 212, 74);
+    g.fillStyle = '#fff';
+    for (let i = 0; i < 7; i++) { star(g, 176 + i * 26.5, 38, 8); g.fill(); }
     g.fillStyle = p.ink; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-    fit(g, 'SEVEN STARS', w - 70, 64, '700 $px "Helvetica Neue", Arial, sans-serif'); g.fillText('SEVEN STARS', w / 2, 480);
-    g.font = '500 20px "Helvetica Neue", Arial, sans-serif'; g.fillStyle = p.accent;
-    g.letterSpacing = '6px'; g.fillText('CHARCOAL FILTER', w / 2 + 3, 520); g.letterSpacing = '0px';
+    fit(g, 'SevenStars', w - 60, 104, '500 $px "Times New Roman", Times, serif'); g.fillText('SevenStars', w / 2, 352);
+    g.font = '13px "Helvetica Neue", Arial, sans-serif'; g.fillText('KING SIZE', w / 2, 400);
+    g.fillStyle = '#3b3326'; g.font = 'italic 600 40px "Times New Roman", Times, serif'; g.fillText('Charcoal Filter', w / 2, 520);
+  },
+  arc(g, w, h, b) {
+    const p = b.pack;
+    // halftone dots fading in towards the lower right
+    for (let y = 40; y < 560; y += 14) for (let x = 10; x < w; x += 14) {
+      const k = Math.max(0, Math.min(1, (x / w) * 0.9 + (y / 560) * 0.6 - 0.55));
+      if (k <= 0) continue;
+      g.fillStyle = `rgba(125,136,224,${0.55 * k})`; g.beginPath(); g.arc(x, y, 1 + 3.2 * k, 0, Math.PI * 2); g.fill();
+    }
+    // the arc: a crescent that brightens from white into gold
+    const gr = g.createLinearGradient(80, 520, 470, 60);
+    gr.addColorStop(0, 'rgba(244,239,227,0)'); gr.addColorStop(0.35, p.accent); gr.addColorStop(1, p.ink);
+    g.fillStyle = gr; g.beginPath();
+    g.moveTo(60, 530); g.quadraticCurveTo(470, 430, 452, 60); g.quadraticCurveTo(440, 400, 60, 530); g.fill();
+    // swoosh emblem
+    g.strokeStyle = p.accent; g.lineWidth = 7; g.lineCap = 'round';
+    g.beginPath(); g.ellipse(410, 214, 30, 15, -0.2, Math.PI * 0.15, Math.PI * 1.05); g.stroke();
+    g.beginPath(); g.ellipse(410, 214, 30, 15, -0.2, Math.PI * 1.15, Math.PI * 2.05); g.stroke();
+    g.fillStyle = p.ink; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    fit(g, 'MEVIUS', 320, 86, '600 $px Optima, Candara, "Gill Sans", sans-serif'); g.fillText('MEVIUS', 46, 252);
+    g.font = '600 22px Optima, Candara, "Gill Sans", sans-serif'; g.letterSpacing = '8px'; g.fillText('ORIGINAL', 50, 292); g.letterSpacing = '0px';
+    g.font = '600 40px Optima, Candara, sans-serif'; g.textAlign = 'right'; g.fillText('10', w - 46, 530);
   },
   devil(g, w, h, b) {
     const p = b.pack;
-    g.fillStyle = p.accent;
-    for (const s of [-1, 1]) {           // horns
-      g.beginPath();
-      g.moveTo(w / 2 + s * 40, 250);
-      g.quadraticCurveTo(w / 2 + s * 120, 230, w / 2 + s * 112, 120);
-      g.quadraticCurveTo(w / 2 + s * 92, 200, w / 2 + s * 16, 222);
-      g.closePath(); g.fill();
-    }
+    g.strokeStyle = '#5c5d61'; g.lineWidth = 4; g.strokeRect(18, 18, w - 36, 526);
     g.fillStyle = p.ink; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-    fit(g, 'Black Devil', w - 50, 92, 'italic 700 $px "Snell Roundhand", "Brush Script MT", "Apple Chancery", cursive');
-    g.fillText('Black Devil', w / 2, 360);
-    g.strokeStyle = p.accent; g.lineWidth = 3; g.beginPath(); g.moveTo(120, 392); g.lineTo(w - 120, 392); g.stroke();
-    g.fillStyle = p.accent2; g.font = '600 22px "Helvetica Neue", Arial, sans-serif';
-    g.letterSpacing = '7px'; g.fillText('SPECIAL FLAVOUR', w / 2 + 3, 436); g.letterSpacing = '0px';
+    fit(g, 'BLACK DEVIL', w - 70, 76, '$px "Chalkduster", "Marker Felt", "Bradley Hand", fantasy');
+    g.save(); g.translate(w / 2, 168); g.rotate(-0.04); g.fillText('BLACK DEVIL', 0, 0); g.restore();
+    g.font = 'italic 34px "Snell Roundhand", "Apple Chancery", "Brush Script MT", cursive'; g.fillStyle = '#9a9b9f';
+    g.fillText('Special Flavour', w / 2 - 40, 222);
+    // red seal with the grinning devil and his trident
+    const cx = w / 2 + 70, cy = 390, r = 92;
+    g.fillStyle = p.accent2; g.beginPath(); g.arc(cx, cy, r + 8, 0, Math.PI * 2); g.fill();
+    g.fillStyle = p.accent; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#0a0a0a';
+    g.beginPath(); g.arc(cx - 10, cy - 6, 36, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(cx - 10, cy + 52, 34, 26, 0, Math.PI, Math.PI * 2); g.fill();
+    for (const s of [-1, 1]) { g.beginPath(); g.moveTo(cx - 10 + s * 18, cy - 34); g.lineTo(cx - 10 + s * 34, cy - 64); g.lineTo(cx - 10 + s * 32, cy - 26); g.fill(); }
+    g.strokeStyle = p.accent; g.lineWidth = 4; g.beginPath(); g.arc(cx - 10, cy + 2, 18, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+    g.fillStyle = p.accent; for (const s of [-1, 1]) { g.beginPath(); g.arc(cx - 10 + s * 13, cy - 14, 5, 0, Math.PI * 2); g.fill(); }
+    g.strokeStyle = '#d7d8dc'; g.lineWidth = 6; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(cx + 44, cy + 70); g.lineTo(cx + 44, cy - 50); g.stroke();
+    g.beginPath(); g.moveTo(cx + 26, cy - 72); g.lineTo(cx + 26, cy - 50); g.lineTo(cx + 62, cy - 50); g.lineTo(cx + 62, cy - 72); g.moveTo(cx + 44, cy - 50); g.lineTo(cx + 44, cy - 78); g.stroke();
+    g.fillStyle = p.ink; g.font = '600 17px "Helvetica Neue", Arial, sans-serif'; g.textAlign = 'left';
+    g.fillText('20 BLACK', 50, 470); g.fillText('FILTER CIGARETTES', 50, 494);
   },
   kretek(g, w, h, b) {
     const p = b.pack;
