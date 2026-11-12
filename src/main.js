@@ -9,7 +9,9 @@ import { createFx } from './fx.js';
 import { Pack } from './pack.js';
 import { Tracker } from './stats.js';
 import { createPanel, fmtDur } from './panel.js';
-import { BRANDS, brand as getBrand } from './brands.js';
+import { BRANDS, brand as getBrand, isVape } from './brands.js';
+import { Vape } from './vape.js';
+import { createCloud } from './cloud.js';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
@@ -41,8 +43,15 @@ scene.add(key, rim, fill);
 const timeU = { value: 0 };
 const fx = createFx(scene, camera);
 const tracker = new Tracker();
-const cig = new Cigarette(scene, fx, timeU, { brand: tracker.brand });
-const pack = new Pack(scene, tracker.brand, tracker.left());
+const cig = new Cigarette(scene, fx, timeU, { brand: tracker.cigBrand });
+const pack = new Pack(scene, tracker.cigBrand, tracker.left(tracker.cigBrand));
+let mode = isVape(tracker.brand);       // true while a Geek Bar is in hand
+const vape = new Vape(scene, fx, { brand: mode ? tracker.brand : 'geekbar', left: mode ? tracker.puffsLeft() : undefined });
+vape.root.position.set(0, 1.3, 0);
+vape.root.visible = mode;
+const cloud = createCloud(document.body, { z: 5 });
+vape.on('hit', (h) => { const { left, opened } = tracker.hit(h, vape.brand.id); vape.setLeft(left, opened); });
+vape.on('exhale', (amount) => cloud.burst(amount));
 
 cig.on('light', () => tracker.clearHand());
 cig.on('drag', () => tracker.drag());
@@ -86,6 +95,7 @@ addEventListener('wheel', (e) => {
   e.preventDefault();
   const px = e.deltaY * (e.deltaMode === 1 ? 16 : 1);
   pull(px); tracker.scroll(px);
+  if (mode) vape.feed(px);
 }, { passive: false });
 
 // the stub shrinks away, the pack opens and the next one slides out
@@ -93,15 +103,25 @@ const stage = { k: 1, target: 1 };
 function takeNew() {
   if (pack.busy) return;
   stage.target = 0;
-  const { left, opened } = tracker.take();
-  pack.take({ left, refill: opened, onOut: () => { cig.reset(); cig.setBrand(tracker.brand); stage.target = 1; } });
+  const { left, opened } = tracker.take(tracker.cigBrand);
+  pack.take({ left, refill: opened, onOut: () => { cig.reset(); cig.setBrand(tracker.cigBrand); stage.target = 1; } });
 }
 function lightOrNew() { if (cig.state === 'fresh') cig.light(); else if (cig.state === 'out') takeNew(); }
 function setBrand(id) {
+  const was = mode;
   tracker.setBrand(id);
-  cig.setBrand(id);
-  pack.swapTo(id, tracker.left(id));
-  shown = '';
+  mode = isVape(id);
+  if (mode) {
+    vape.setDevice(id, tracker.puffsLeft(id));
+    if (!was) vape.show();
+  } else {
+    vape.root.visible = false;
+    cig.setBrand(id);
+    pack.swapTo(id, tracker.left(id));
+    pack.root.visible = true;
+    if (stage.target === 0 && !pack.busy) takeNew();
+  }
+  shown = ''; hudAt = 0;
 }
 function cycleBrand(dir = 1) {
   const i = BRANDS.findIndex((b) => b.id === tracker.brand);
@@ -123,8 +143,9 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyT') return panel.toggle();
   if (panel.isOpen) return;
   if (e.code === 'Space') { e.preventDefault(); holdOn(); }
-  else if (e.code === 'KeyP') cig.pop();
   else if (e.code === 'KeyB') cycleBrand(e.shiftKey ? -1 : 1);
+  else if (mode) return;
+  else if (e.code === 'KeyP') cig.pop();
   else if (e.code === 'KeyL') lightOrNew();
   else if (e.code === 'KeyA') cig.ash();
   else if (e.code === 'KeyS') cig.stub();
@@ -137,27 +158,33 @@ const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 function overPack(e) {
   ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   ray.setFromCamera(ndc, camera);
-  return pack.hit(ray);
+  return mode ? vape.hit(ray) : pack.hit(ray);
 }
-let px = 0, py = 0, pt = 0;
+let px = 0, py = 0, pt = 0, down = null;
+const held = () => (mode ? vape : cig);
 canvas.addEventListener('pointerdown', (e) => {
-  if (overPack(e)) { panel.open(); return; }
+  if (!mode && overPack(e)) { panel.open(); return; }
+  down = { x: e.clientX, y: e.clientY };
   canvas.setPointerCapture(e.pointerId); canvas.classList.add('dragging');
-  cig.grabbed = true; cig.yawVel = 0; px = e.clientX; py = e.clientY; pt = performance.now();
+  held().grabbed = true; held().yawVel = 0; px = e.clientX; py = e.clientY; pt = performance.now();
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (!cig.grabbed) { canvas.style.cursor = overPack(e) ? 'pointer' : ''; return; }
+  const h = held();
+  if (!h.grabbed) { canvas.style.cursor = overPack(e) ? 'pointer' : ''; return; }
   const now = performance.now(), dts = Math.max(0.004, (now - pt) / 1000);
   const dy = (e.clientX - px) * 0.008;
-  cig.yaw += dy;
-  cig.yawVel = cig.yawVel * 0.6 + (dy / dts) * 0.4;
-  cig.tilt = Math.min(0.75, Math.max(-0.6, cig.tilt - (e.clientY - py) * 0.005));
+  h.yaw += dy;
+  h.yawVel = h.yawVel * 0.6 + (dy / dts) * 0.4;
+  h.tilt = Math.min(0.75, Math.max(-0.6, h.tilt - (e.clientY - py) * 0.005));
   px = e.clientX; py = e.clientY; pt = now;
 });
-for (const ev of ['pointerup', 'pointercancel']) canvas.addEventListener(ev, () => {
-  cig.grabbed = false; canvas.classList.remove('dragging');
-  if (performance.now() - pt > 80) cig.yawVel = 0;
-  cig.yawVel = Math.max(-9, Math.min(9, cig.yawVel));
+for (const ev of ['pointerup', 'pointercancel']) canvas.addEventListener(ev, (e) => {
+  const h = held();
+  if (mode && down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 5 && overPack(e)) panel.open();
+  down = null;
+  h.grabbed = false; canvas.classList.remove('dragging');
+  if (performance.now() - pt > 80) h.yawVel = 0;
+  h.yawVel = Math.max(-9, Math.min(9, h.yawVel));
 });
 
 let shown = '';
@@ -166,14 +193,25 @@ function syncHud(now) {
   if (now - hudAt < 400) return;
   hudAt = now;
   const s = tracker.snapshot().session, b = getBrand(tracker.brand);
+  if (mode) {
+    hud.innerHTML = `<b>${s.puffs}</b> puff${s.puffs === 1 ? '' : 's'} · <b>${s.blinkers}</b> blinker${s.blinkers === 1 ? '' : 's'} · <b>${fmtDur(s.activeMs)}</b> scrolling · <b>${s.nic.toFixed(1)}</b> mg nicotine`
+      + `<span>${b.name} · ${b.flavour} · ${tracker.puffsLeft().toLocaleString()} / ${b.puffs.toLocaleString()} puffs left</span>`;
+    return;
+  }
   hud.innerHTML = `<b>${s.cigs}</b> cig${s.cigs === 1 ? '' : 's'} · <b>${(s.cigs / 20).toFixed(2)}</b> packs · <b>${fmtDur(s.activeMs)}</b> scrolling · <b>${s.tar.toFixed(1)}</b> mg tar`
     + `<span>${b.name} · ${tracker.left()} / 20 left in pack</span>`;
 }
 function syncUi() {
-  const pop = cig.canPop;
+  const pop = !mode && cig.canPop;
   if (btn.pop.hidden === pop) btn.pop.hidden = !pop;
-  if (cig.state === shown) return;
-  shown = cig.state;
+  const key = mode ? 'vape' : cig.state;
+  if (key === shown) return;
+  shown = key;
+  for (const b of [btn.light, btn.ash, btn.stub]) b.hidden = mode;
+  btn.drag.textContent = mode ? 'Hit' : 'Drag';
+  btn.drag.title = mode ? 'Hold, or keep scrolling. Five seconds straight is a blinker' : 'Hold — or scroll / hold Space';
+  btn.stats.title = mode ? 'T, or click the Geek Bar. B cycles brands' : 'T — or click the pack. B cycles brands';
+  if (mode) { btn.drag.disabled = false; return; }
   const lit = shown === 'lit';
   btn.light.textContent = shown === 'out' ? 'New' : 'Light';
   btn.light.disabled = !(shown === 'fresh' || shown === 'out');
@@ -190,22 +228,28 @@ function frame(now) {
 
   input.energy *= Math.exp(-dt / 0.28);
   const target = Math.max(input.hold, 1 - Math.exp(-input.energy / 260));
-  cig.update(dt, time, target);
-  pack.update(dt, time);
+  if (mode) {
+    vape.update(dt, time, target, input.hold);
+    cig.yawG.visible = false; pack.root.visible = false;
+  } else {
+    cig.update(dt, time, target);
+    pack.update(dt, time);
+    stage.k += (stage.target - stage.k) * (1 - Math.exp(-dt / 0.09));
+    cig.yawG.scale.setScalar(Math.max(1e-3, stage.k));
+    cig.yawG.visible = stage.k > 0.01;
+  }
   fx.update(dt, time);
-  stage.k += (stage.target - stage.k) * (1 - Math.exp(-dt / 0.09));
-  cig.yawG.scale.setScalar(Math.max(1e-3, stage.k));
-  cig.yawG.visible = stage.k > 0.01;
 
   if (now - lastActive < 2500 && !document.hidden) tracker.active(dt / sim.speed * 1000);
   tracker.flush();
   syncHud(now);
 
-  const dist = baseDist * sim.zoom * (1 - 0.035 * cig.inhale);
+  const inh = mode ? vape.inhale : cig.inhale;
+  const dist = baseDist * sim.zoom * (1 - 0.035 * inh);
   LOOK.x = sim.lookX;
   camera.position.set(sim.lookX, 2.2, dist);
   camera.lookAt(LOOK);
-  bloom.strength = 0.5 + 0.2 * cig.inhale;
+  bloom.strength = 0.5 + 0.2 * inh;
 
   syncUi();
   composer.render();
@@ -214,8 +258,9 @@ requestAnimationFrame(frame);
 addEventListener('pagehide', () => tracker.flush(true));
 
 // first visit: shake one out of the pack; a taken-but-unlit one survives a reload
-if (tracker.hand) cig.setBrand(tracker.hand.brand);
+if (mode) { stage.k = stage.target = 0; pack.root.visible = false; vape.show(); }
+else if (tracker.hand) cig.setBrand(tracker.hand.brand);
 else { stage.k = stage.target = 0; setTimeout(takeNew, 650); }
 
 // handle for the extension layer (and the console)
-window.cig = { cig, pack, tracker, panel, sim, pull, setBrand, takeNew, hold: (v) => (v ? holdOn() : holdOff()) };
+window.cig = { cig, pack, vape, cloud, tracker, panel, sim, pull, setBrand, takeNew, get mode() { return mode; }, hold: (v) => (v ? holdOn() : holdOff()) };

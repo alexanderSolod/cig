@@ -65,7 +65,21 @@ export const BRANDS = [
     },
     pack: { bg: '#3a1f12', bg2: '#5e3418', ink: '#f1d79a', accent: '#d8a548', accent2: '#a3261c', style: 'kretek' },
   },
+  // disposable vapes: no tar, nicotine per puff (16 mL × 50 mg/mL ÷ 15,000 puffs)
+  {
+    id: 'geekbar', kind: 'vape', name: 'Geek Bar Pulse', short: 'Geek Bar', flavour: 'Fcuking Fab', blurb: '15,000 puffs, full-screen display. Scroll till it blinks.',
+    tar: 0, nic: 0.053, co: 0, puffs: 15000, ml: 16, nicPct: 5, price: 20,
+    device: { top: '#ff5f8f', bot: '#ffb27a', shell: '#ffd6e2', led: '#ff8a3d' },
+    pack: { bg: '#ff5f8f', bg2: '#ffb27a', ink: '#ffffff', accent: '#ffd400', accent2: '#ff8a3d', style: 'vape' },
+  },
+  {
+    id: 'geekbar-blue', kind: 'vape', name: 'Geek Bar Pulse', short: 'Blue Razz', flavour: 'Blue Razz Ice', blurb: '15,000 puffs of blue. Scroll till it blinks.',
+    tar: 0, nic: 0.053, co: 0, puffs: 15000, ml: 16, nicPct: 5, price: 20,
+    device: { top: '#3f6bff', bot: '#9a5cff', shell: '#d4defc', led: '#5aa0ff' },
+    pack: { bg: '#3f6bff', bg2: '#9a5cff', ink: '#ffffff', accent: '#ffd400', accent2: '#5aa0ff', style: 'vape' },
+  },
 ];
 
 const BY_ID = Object.fromEntries(BRANDS.map((b) => [b.id, b]));
 export const brand = (id) => BY_ID[id] || BRANDS[0];
+export const isVape = (id) => brand(id).kind === 'vape';

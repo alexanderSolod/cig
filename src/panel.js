@@ -1,7 +1,8 @@
 // The stats screen, laid out like the back of the current brand's pack: session / today / all-time numbers, a 14-day chart, recent sessions,
 // a tar calculator and the brand picker. Plain DOM so it works in a page or a shadow root.
-import { BRANDS, brand as getBrand } from './brands.js';
+import { BRANDS, brand as getBrand, isVape } from './brands.js';
 import { PACK_SIZE, dayKey } from './stats.js';
+import { BLINK_S } from './vape.js';
 
 const LIFE_MIN_PER_CIG = 20;          // rough published estimate of life lost per cigarette
 const PX_TO_M = 0.0254 / 96;          // CSS px are 1/96 inch
@@ -76,6 +77,36 @@ const CSS = `
 .cp-fine{font-size:10px;line-height:1.45;opacity:.72}
 .cp-stamp{border:1.5px solid currentColor;padding:5px 8px;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;text-align:center;line-height:1.3;opacity:.85}
 .cp-reset{text-decoration:underline;opacity:.8}
+.cp-card.cp-vape{--g1:#ff5f8f;--g2:#ffb27a;border-radius:26px;color:#f4f4f6;
+  background:radial-gradient(110% 70% at 0% 0%,color-mix(in srgb,var(--g1) 36%,transparent),transparent 62%),
+    radial-gradient(110% 80% at 100% 100%,color-mix(in srgb,var(--g2) 30%,transparent),transparent 60%),#0b0b10;
+  box-shadow:0 30px 80px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.1)}
+.cp-vape .cp-lid{border-bottom:1px solid rgba(255,255,255,.08);box-shadow:none}
+.cp-vape .cp-tabs button.on{color:#ffd400;border-color:#ffd400}
+.cp-vape .cp-word{font:800 30px/1 "Avenir Next",Futura,"Helvetica Neue",Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+.cp-vape .cp-word small{display:block;font-size:11px;letter-spacing:.38em;font-weight:600;margin-top:7px;color:var(--g1)}
+.cp-vape .cp-warn{background:#040406;color:rgba(255,233,176,.85);border:2px solid #ffd400;outline:0;border-radius:22px;margin:4px 0 20px;padding:16px 18px 12px;
+  box-shadow:0 0 22px rgba(255,212,0,.28),inset 0 0 18px rgba(255,212,0,.08);font:600 11px/1.3 "Helvetica Neue",Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase}
+.cp-scr{display:grid;grid-template-columns:1fr 1.7fr 1fr;align-items:end;gap:10px;margin-bottom:12px}
+.cp-scr div{display:flex;flex-direction:column;align-items:center;gap:7px}
+.cp-scr svg{display:block;filter:drop-shadow(0 0 6px rgba(255,170,40,.55))}
+.cp-scr em{font-style:normal;font-size:9.5px;letter-spacing:.18em;color:rgba(255,233,176,.6)}
+.cp-vape .cp-panel{background:rgba(255,255,255,.045);color:#f4f4f6;border:1px solid rgba(255,255,255,.09);border-radius:16px}
+.cp-vape .cp-panel h3{border-bottom:1px solid rgba(255,212,0,.5);color:#ffd400}
+.cp-vape .cp-tbl td,.cp-vape .cp-sess div{border-bottom-color:rgba(255,255,255,.08)}
+.cp-vape .cp-tbl small,.cp-vape .cp-note,.cp-vape .cp-days,.cp-vape .cp-sess em,.cp-vape .cp-bl,.cp-vape .cp-in label{color:rgba(244,244,246,.55)}
+.cp-vape .cp-in input{color:#fff;border-bottom-color:#ffd400}
+.cp-vape .cp-bars{border-bottom-color:rgba(255,255,255,.3)}
+.cp-vape .cp-bar{background:linear-gradient(180deg,var(--g1),var(--g2));border-radius:3px 3px 0 0}
+.cp-vape .cp-bar.today{background:#ffd400}
+.cp-vape .cp-brand.on{border-color:#ffd400}
+.cp-vape .cp-brand:hover{background:rgba(255,255,255,.06)}
+.cp-vape .cp-split{background:rgba(255,255,255,.08)}
+.cp-vape .cp-code{border-radius:6px}
+.cp-vape .cp-stamp{background:#fff;color:#000;border:3px solid #000;outline:3px solid #fff;outline-offset:0;font-weight:800;letter-spacing:.01em;text-transform:none;font-size:11px;opacity:1;max-width:190px}
+.cp-sw.vape{border-radius:6px}
+.cp-sw.vape i{left:auto;right:5px;top:-1px;width:11px;height:20%;background:rgba(255,255,255,.6);border-radius:3px}
+.cp-sw.vape b{left:2px;right:auto;top:14%;bottom:14%;width:5px;height:auto;background:#111;outline:1px solid #ffd400;outline-offset:0;border-radius:2px}
 `;
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -106,6 +137,35 @@ function jar(fill) {
     <rect x="10" y="6" width="44" height="9" rx="2" fill="#6b6b72"/></svg>`;
 }
 
+const SEG = { 0: 'abcdef', 1: 'bc', 2: 'abged', 3: 'abgcd', 4: 'fgbc', 5: 'afgcd', 6: 'afgedc', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg' };
+const SEG_R = { a: [1, 0, 4, 1], b: [5, 1, 1, 3.5], c: [5, 5.5, 1, 3.5], d: [1, 9, 4, 1], e: [0, 5.5, 1, 3.5], f: [0, 1, 1, 3.5], g: [1, 4.5, 4, 1] };
+// seven-segment digits, like the Pulse's screen
+function seg7(n, h = 30, on = '#ffaa28') {
+  const str = String(n), w = str.length * 7.4 - 0.6;
+  let out = '';
+  [...str].forEach((ch, i) => {
+    const lit = SEG[ch] || '';
+    for (const [k, [x, y, sw, sh]] of Object.entries(SEG_R)) {
+      out += `<rect x="${(i * 7.4 + x + (10 - y) * 0.08).toFixed(2)}" y="${y}" width="${sw}" height="${sh}" rx=".35" fill="${lit.includes(k) ? on : 'rgba(255,170,40,.09)'}"/>`;
+    }
+  });
+  return `<svg viewBox="0 0 ${w.toFixed(1)} 10" width="${((w * h) / 10).toFixed(0)}" height="${h}" role="img" aria-label="${str}">${out}</svg>`;
+}
+const ICON = {
+  bolt: '<svg viewBox="0 0 12 20" width="11" height="18" aria-hidden="true"><path d="M7 0 0 11h5l-2 9 9-12H7z" fill="#ffd400"/></svg>',
+  drop: '<svg viewBox="0 0 14 20" width="12" height="18" aria-hidden="true"><path d="M7 0C10 5 14 9 14 13a7 7 0 0 1-14 0C0 9 4 5 7 0z" fill="#ffd400"/></svg>',
+};
+// e-liquid capsule gauge for the vape calculator: fills per device, ×N underneath
+function capsule(dev) {
+  const fill = dev <= 0 ? 0 : dev % 1 || 1, y = 8 + 80 * (1 - fill);
+  return `<svg viewBox="0 0 44 112" width="44" height="112" aria-hidden="true">
+    <defs><clipPath id="cpcap"><rect x="6" y="8" width="32" height="80" rx="16"/></clipPath>
+    <linearGradient id="cpliq" x1="0" x2="0" y1="0" y2="1"><stop offset="0" style="stop-color:var(--g1)"/><stop offset="1" style="stop-color:var(--g2)"/></linearGradient></defs>
+    <g clip-path="url(#cpcap)"><rect x="0" y="${y.toFixed(1)}" width="44" height="100" fill="url(#cpliq)"/></g>
+    <rect x="6" y="8" width="32" height="80" rx="16" fill="none" stroke="#ffd400" stroke-width="2"/>
+    <text x="22" y="106" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">×${dev.toFixed(dev < 10 ? 1 : 0)}</text></svg>`;
+}
+
 export function createPanel(root, tracker, { onBrand } = {}) {
   const style = document.createElement('style');
   style.textContent = CSS;
@@ -127,9 +187,9 @@ export function createPanel(root, tracker, { onBrand } = {}) {
           <section class="cp-panel"><h3>Contents</h3><table class="cp-tbl"></table></section>
           <section class="cp-panel"><h3>Tar calculator</h3>
             <div class="cp-in">
-              <label>Cigs a day<input type="number" min="0" max="200" step="1" data-k="perDay"></label>
+              <label><span data-l="perDay">Cigs a day</span><input type="number" min="0" max="200" step="1" data-k="perDay"></label>
               <label>Years<input type="number" min="0" max="80" step="1" data-k="years"></label>
-              <label>$ a pack<input type="number" min="0" max="100" step="0.5" data-k="price"></label>
+              <label><span data-l="price">$ a pack</span><input type="number" min="0" max="100" step="0.5" data-k="price"></label>
             </div>
             <div class="cp-calc"><div class="cp-jar"></div><table class="cp-tbl cp-res"></table></div>
             <div class="cp-note"></div></section>
@@ -141,7 +201,7 @@ export function createPanel(root, tracker, { onBrand } = {}) {
         </div>
       </div>
       <div class="cp-foot"><div class="cp-code"></div>
-        <div class="cp-fine">Made by your thumb under licence from the feed. Figures are estimates from brand averages; life cost uses a rough 20 minutes per cigarette and is not medical advice.
+        <div class="cp-fine"><span class="cp-fine-t"></span>
           <button class="cp-reset" title="Wipe all stats">Reset ledger</button></div>
         <div class="cp-stamp"></div></div>
     </div>
@@ -151,17 +211,18 @@ export function createPanel(root, tracker, { onBrand } = {}) {
   const $ = (s) => scrim.querySelector(s);
   const $$ = (s) => [...scrim.querySelectorAll(s)];
   let tab = 'session', timer = 0;
-  const calc = { perDay: null, years: 1 };
+  const calc = { perDay: null, years: 1 }, calcV = { perDay: null, years: 1 };
+  let vape = false;
 
   scrim.addEventListener('pointerdown', (e) => { if (e.target === scrim) close(); });
   $('.cp-x').addEventListener('click', () => close());
   $$('[data-tab]').forEach((b) => b.addEventListener('click', () => { tab = b.dataset.tab; render(); }));
   $('.cp-reset').addEventListener('click', () => {
-    if (confirm('Wipe every cigarette, pack and session from the ledger?')) { tracker.reset(); calc.perDay = null; render(true); }
+    if (confirm('Wipe every cigarette, pack and session from the ledger?')) { tracker.reset(); calc.perDay = calcV.perDay = null; render(true); }
   });
   $$('.cp-in input').forEach((inp) => inp.addEventListener('input', () => {
     const v = Math.max(0, Number(inp.value) || 0);
-    if (inp.dataset.k === 'price') tracker.setSetting('price', v); else calc[inp.dataset.k] = v;
+    if (inp.dataset.k === 'price') tracker.setSetting(vape ? 'vprice' : 'price', v); else (vape ? calcV : calc)[inp.dataset.k] = v;
     renderCalc(false);
   }));
   // keep the host page (X's own shortcuts) out of it while typing
@@ -184,11 +245,12 @@ export function createPanel(root, tracker, { onBrand } = {}) {
 
   function renderBrands(snap) {
     $('.cp-brands').innerHTML = BRANDS.map((b) => {
-      const left = snap.packs[b.id] == null ? 'sealed pack' : `${snap.packs[b.id]} / ${PACK_SIZE} left`;
+      const v = b.kind === 'vape';
+      const left = v ? `${(snap.vapes[b.id] ?? b.puffs).toLocaleString()} puffs left` : snap.packs[b.id] == null ? 'sealed pack' : `${snap.packs[b.id]} / ${PACK_SIZE} left`;
       const top = b.pack.style === 'roof' ? b.pack.accent : b.pack.bg2 || b.pack.accent;
       return `<button class="cp-brand${b.id === snap.brand ? ' on' : ''}" data-brand="${b.id}" title="${esc(b.blurb)}">
-        <div class="cp-sw" style="background:${b.pack.bg}"><i style="background:${top}"></i><b></b></div>
-        <div><div class="cp-bn">${esc(b.name)}</div><div class="cp-bl">${left} · ${b.tar} mg</div></div></button>`;
+        ${v ? `<div class="cp-sw vape" style="background:linear-gradient(${b.pack.bg},${b.pack.bg2})"><i></i><b></b></div>` : `<div class="cp-sw" style="background:${b.pack.bg}"><i style="background:${top}"></i><b></b></div>`}
+        <div><div class="cp-bn">${esc(v ? `${b.short === 'Geek Bar' ? 'Geek Bar Pulse' : `Geek Bar ${b.short}`}` : b.name)}</div><div class="cp-bl">${left} · ${v ? `${b.nicPct}% nic` : `${b.tar} mg`}</div></div></button>`;
     }).join('');
     $$('[data-brand]').forEach((el) => el.addEventListener('click', () => {
       if (el.dataset.brand === tracker.brand) return;
@@ -215,6 +277,10 @@ export function createPanel(root, tracker, { onBrand } = {}) {
     const card = $('.cp-card');
     card.style.setProperty('--bg', b.pack.bg); card.style.setProperty('--bg2', b.pack.bg2 || b.pack.bg);
     card.style.setProperty('--ink', b.pack.ink); card.style.setProperty('--word', WORD[b.pack.style] || WORD.roof);
+    $('.cp-fine-t').textContent = vape
+      ? `${b.puffs.toLocaleString()} puffs · ${b.ml} mL · ${b.nicPct}% nicotine · 650 mAh · dual mesh coil. Hold a draw ${BLINK_S} s and it blinks. Estimates only, not medical advice. `
+      : 'Made by your thumb under licence from the feed. Figures are estimates from brand averages; life cost uses a rough 20 minutes per cigarette and is not medical advice. ';
+    if (vape) return renderVape(snap, s, b, span, m);
     $('.cp-word').textContent = b.name;
     $('.cp-count').textContent = `${tracker.left()} of ${PACK_SIZE} cigarettes left`;
     $('.cp-warn').innerHTML = `${WHEN[tab]} you smoked ${s.cigs} cigarette${s.cigs === 1 ? '' : 's'} (${fmtPacks(s.cigs)} pack${s.cigs === PACK_SIZE ? '' : 's'}) in ${fmtDur(s.activeMs)} of scrolling`;
@@ -237,23 +303,56 @@ export function createPanel(root, tracker, { onBrand } = {}) {
     $('.cp-stamp').innerHTML = `Scroll duty paid<br>${b.tar} mg tar · ${b.nic} mg nic · ${b.co} mg CO`;
   }
 
+  function renderVape(snap, s, b, span, m) {
+    const card = $('.cp-card');
+    card.style.setProperty('--g1', b.device.top); card.style.setProperty('--g2', b.device.bot);
+    const left = tracker.puffsLeft(), used = b.puffs - left;
+    $('.cp-word').innerHTML = `Geek Bar<small>Pulse · ${esc(b.flavour)}</small>`;
+    $('.cp-count').textContent = `${left.toLocaleString()} of ${b.puffs.toLocaleString()} puffs left`;
+    const puffs = s.puffs || 0, blinks = s.blinkers || 0, ms = s.vapeMs || 0;
+    $('.cp-warn').innerHTML = `<div class="cp-scr">
+      <div>${ICON.bolt}${seg7(Math.round(100 - (used % 600) / 6), 30)}<em>Battery</em></div>
+      <div>${seg7(puffs, 52)}<em>Puffs</em></div>
+      <div>${ICON.drop}${seg7(Math.ceil((100 * left) / b.puffs), 30)}<em>E-liquid</em></div></div>
+      ${WHEN[tab]}: ${blinks} blinker${blinks === 1 ? '' : 's'} in ${fmtDur(s.activeMs)} of scrolling`;
+    const pace = s.activeMs > 60e3 ? puffs / (s.activeMs / 3.6e6) : null;
+    const price = snap.settings.vprice ?? b.price;
+    const row = (k, v, note, hi) => `<tr${hi ? ' class="hi"' : ''}><td>${k}${note ? `<small>${note}</small>` : ''}</td><td>${v}</td></tr>`;
+    $('.cp-tbl').innerHTML = [
+      row('Puffs', puffs.toLocaleString(), puffs ? `${(ms / puffs / 1000).toFixed(1)} s average draw` : 'scroll to take a hit', 1),
+      row('Blinkers', blinks, puffs ? `${Math.round((100 * blinks) / puffs)}% of puffs held ${BLINK_S} s` : '', 1),
+      row('Nicotine', fmtMg(s.nic), s.nic ? `about ${(s.nic / 0.8).toFixed(1)} cigarettes’ worth by label` : '', 1),
+      row('E-liquid', `${((puffs * b.ml) / b.puffs).toFixed(2)} mL`),
+      row('Devices', s.devices || 0, 'opened'),
+      row('Time on the bar', fmtDur(ms)),
+      row('Time scrolling', fmtDur(s.activeMs), span != null ? `session open ${fmtDur(span)}` : ''),
+      row('Distance scrolled', fmtDist(s.scrollPx), m > 33 ? `${(m / 330).toFixed(2)} Eiffel Towers` : `${Math.round(m * 100 / 1.75)}% of your height`),
+      row('Pace', pace == null ? '—' : `${pace.toFixed(0)} puffs an hour`),
+      row('Spent', fmtMoney((puffs / b.puffs) * price)),
+      s.cigs ? row('Cigarettes too', s.cigs, `${fmtMg(s.tar)} tar`) : '',
+    ].join('');
+    $('.cp-code').innerHTML = `${barcode(snap.total.puffs * 17 + 3)}${dayKey(s.start).replace(/-/g, '')}${String(snap.total.puffs).padStart(5, '0')}`;
+    $('.cp-stamp').textContent = 'WARNING: This product contains nicotine. Nicotine is an addictive chemical.';
+  }
+
   function renderHistory(snap) {
+    const vk = vape ? 'puffs' : 'cigs';
     const days = [], now = new Date();
     for (let i = 13; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      days.push({ k: dayKey(d.getTime()), d, v: (snap.days[dayKey(d.getTime())] || {}).cigs || 0 });
+      days.push({ k: dayKey(d.getTime()), d, v: (snap.days[dayKey(d.getTime())] || {})[vk] || 0 });
     }
-    days[13].v = snap.today.cigs;
-    const max = Math.max(5, ...days.map((d) => d.v));
+    days[13].v = snap.today[vk] || 0;
+    const max = Math.max(vape ? 30 : 5, ...days.map((d) => d.v));
     $('.cp-bars').innerHTML = days.map((d, i) =>
-      `<div class="cp-bar${i === 13 ? ' today' : ''}" style="height:${(d.v / max) * 100}%" title="${d.k}: ${d.v} cigarettes (${fmtPacks(d.v)} packs)">${d.v ? `<span>${d.v}</span>` : ''}</div>`).join('');
+      `<div class="cp-bar${i === 13 ? ' today' : ''}" style="height:${(d.v / max) * 100}%" title="${d.k}: ${d.v} ${vape ? 'puffs' : `cigarettes (${fmtPacks(d.v)} packs)`}">${d.v ? `<span>${d.v}</span>` : ''}</div>`).join('');
     $('.cp-days').innerHTML = days.map((d) => `<div>${'SMTWTFS'[d.d.getDay()]}</div>`).join('');
-    const sess = snap.sessions.filter((s) => s.cigs || s.activeMs > 5000).slice(0, 5);
+    const sess = snap.sessions.filter((s) => s.cigs || s.puffs || s.activeMs > 5000).slice(0, 5);
     $('.cp-sess').innerHTML = sess.length ? sess.map((s, i) => {
       const d = new Date(s.start);
       const when = dayKey(s.start) === dayKey() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
       return `<div><span>${i === 0 && snap.sessions[0] === s ? 'Now' : when} <em>· ${fmtDur(s.last - s.start)} open, ${fmtDur(s.activeMs)} scrolling</em></span>
-        <b>${s.cigs} cig${s.cigs === 1 ? '' : 's'}</b><em>${fmtPacks(s.cigs)} pk</em></div>`;
+        ${vape ? `<b>${s.puffs || 0} puff${s.puffs === 1 ? '' : 's'}</b><em>${s.blinkers || 0} blink</em>` : `<b>${s.cigs} cig${s.cigs === 1 ? '' : 's'}</b><em>${fmtPacks(s.cigs)} pk</em>`}</div>`;
     }).join('') : '<div><em>No sessions yet. Go scroll something.</em></div>';
     const total = Object.values(snap.brands).reduce((a, b) => a + b, 0) || 1;
     $('.cp-split').innerHTML = BRANDS.filter((b) => snap.brands[b.id]).map((b) =>
@@ -262,6 +361,9 @@ export function createPanel(root, tracker, { onBrand } = {}) {
 
   function renderCalc(fillInputs) {
     const snap = tracker.snapshot();
+    $('[data-l="perDay"]').textContent = vape ? 'Puffs a day' : 'Cigs a day';
+    $('[data-l="price"]').textContent = vape ? '$ a device' : '$ a pack';
+    if (vape) return renderCalcVape(snap, fillInputs);
     const avg = avgPerDay(snap), mix = brandsUsed(snap);
     if (calc.perDay == null) calc.perDay = Math.max(1, Math.round(avg) || 10);
     const price = snap.settings.price || 0;
@@ -284,8 +386,38 @@ export function createPanel(root, tracker, { onBrand } = {}) {
       + `${avg ? ` · you average ${avg.toFixed(1)} a day` : ''}. Jar ≈ ${JAR_G} g. Life ≈ ${LIFE_MIN_PER_CIG} min per cigarette, a rough estimate.`;
   }
 
+  function renderCalcVape(snap, fillInputs) {
+    const b = getBrand(snap.brand);
+    const days = Object.values(snap.days).filter((d) => d.puffs > 0);
+    const avg = days.length ? days.reduce((a, d) => a + d.puffs, 0) / days.length : 0;
+    if (calcV.perDay == null) calcV.perDay = Math.max(1, Math.round(avg) || 300);
+    const price = snap.settings.vprice ?? b.price;
+    if (fillInputs) {
+      scrim.querySelector('[data-k="perDay"]').value = calcV.perDay;
+      scrim.querySelector('[data-k="years"]').value = calcV.years;
+      scrim.querySelector('[data-k="price"]').value = price;
+    }
+    const t = snap.total, puffs = calcV.perDay * 365.25 * calcV.years, dev = puffs / b.puffs;
+    const blinkRate = t.puffs ? t.blinkers / t.puffs : 0, drawS = t.puffs ? t.vapeMs / t.puffs / 1000 : 2.5;
+    const ml = (puffs * b.ml) / b.puffs, nicG = (puffs * b.nic) / 1000;
+    $('.cp-jar').innerHTML = capsule(dev);
+    const r = (k, v) => `<tr><td>${k}</td><td>${v}</td></tr>`;
+    $('.cp-res').innerHTML = [
+      r('Puffs', Math.round(puffs).toLocaleString()), r('Devices', dev.toFixed(dev < 10 ? 1 : 0)),
+      r('Nicotine', `${nicG.toFixed(nicG < 10 ? 2 : 1)} g`), r('E-liquid', ml < 1000 ? `${ml.toFixed(0)} mL` : `${(ml / 1000).toFixed(2)} L`),
+      r('Cost', fmtMoney(dev * price)), r('Blinkers', Math.round(puffs * blinkRate).toLocaleString()),
+      r('On the bar', fmtLife((puffs * drawS) / 60)), r('Cigarettes’ nicotine', Math.round((puffs * b.nic) / 0.8).toLocaleString()),
+    ].join('');
+    $('.cp-note').textContent = `${b.ml} mL at ${b.nicPct}% over ${b.puffs.toLocaleString()} puffs ≈ ${b.nic} mg nicotine a puff`
+      + `${avg ? ` · you average ${Math.round(avg)} puffs a day` : ''}. Cigarette comparison uses Classic Gold’s 0.8 mg label nicotine. Rough estimates.`;
+  }
+
   function render(full = false) {
     const snap = tracker.snapshot();
+    const was = vape;
+    vape = isVape(snap.brand);
+    $('.cp-card').classList.toggle('cp-vape', vape);
+    if (was !== vape) full = true;
     $$('[data-tab]').forEach((b) => { b.classList.toggle('on', b.dataset.tab === tab); b.setAttribute('aria-selected', b.dataset.tab === tab); });
     renderBrands(snap); renderNumbers(snap); renderHistory(snap);
     if (full) renderCalc(true);
@@ -294,7 +426,7 @@ export function createPanel(root, tracker, { onBrand } = {}) {
   function open() {
     if (scrim.classList.contains('on')) return;
     clearInterval(timer);
-    scrim.hidden = false; calc.perDay = null;
+    scrim.hidden = false; calc.perDay = calcV.perDay = null;
     render(true);
     requestAnimationFrame(() => scrim.classList.add('on'));
     timer = setInterval(() => render(false), 1000);

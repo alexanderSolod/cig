@@ -6,6 +6,9 @@ import { createFx } from './fx.js';
 import { Pack } from './pack.js';
 import { Tracker } from './stats.js';
 import { createPanel, fmtDur } from './panel.js';
+import { isVape } from './brands.js';
+import { Vape } from './vape.js';
+import { createCloud } from './cloud.js';
 
 const BOX_W = 520, BOX_H = 780;       // canvas size, CSS px
 const PX_PER_CM = 24;                 // cigarette ≈ 200px long
@@ -39,6 +42,8 @@ canvas.fade { opacity: 0; }
 .chip b { color: #fff; font-variant-numeric: tabular-nums; }
 .box.light .chip { color: rgba(0,0,0,.6); background: rgba(255,255,255,.8); border-color: rgba(0,0,0,.1); }
 .box.light .chip b { color: #000; }
+.box.vape .hit { width: 150px; height: 200px; left: ${(BOX_W - 150) / 2}px; bottom: ${ORIGIN_UP - 80}px; border-radius: 28px; }
+.box.vape .chip { bottom: ${ORIGIN_UP + 128}px; }
 `;
 
 function load() { try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch { return {}; } }
@@ -92,25 +97,49 @@ export function mount() {
   const timeU = { value: 0 };
   const fx = createFx(scene, camera, { glow: true });
   const tracker = new Tracker();
-  const cig = new Cigarette(scene, fx, timeU, { sway: true, brand: tracker.brand });
+  const cig = new Cigarette(scene, fx, timeU, { sway: true, brand: tracker.cigBrand });
   cig.on('light', () => tracker.clearHand());
   cig.on('drag', () => tracker.drag());
   cig.on('burn', (f) => tracker.burn(f, cig.brand.id));
   cig.on('pop', () => tracker.pop());
 
   // the pack only shows up to hand over the next one
-  const pack = new Pack(scene, tracker.brand, tracker.left());
+  const pack = new Pack(scene, tracker.cigBrand, tracker.left(tracker.cigBrand));
   pack.root.position.set(0, 5.6, -1.5); pack.yaw = 0.35;
   const packK = { k: 0, target: 0, hideAt: 0 };
   const stage = { k: 1, target: 1 };
 
-  const panel = createPanel(root, tracker, { onBrand(id) { tracker.setBrand(id); cig.setBrand(id); pack.swapTo(id, tracker.left(id)); } });
+  let mode = isVape(tracker.brand);     // a Geek Bar instead of a cigarette
+  const vape = new Vape(scene, fx, { brand: mode ? tracker.brand : 'geekbar', left: mode ? tracker.puffsLeft() : undefined });
+  vape.root.position.set(0, 0.9, 0); vape.root.scale.setScalar(0.8); vape.root.visible = mode;
+  box.classList.toggle('vape', mode);
+  const cloud = createCloud(root, { before: box });
+  vape.on('hit', (h) => { const { left, opened } = tracker.hit(h, vape.brand.id); vape.setLeft(left, opened); });
+  vape.on('exhale', (amount) => cloud.burst(amount));
+  function setBrand(id) {
+    const was = mode;
+    tracker.setBrand(id);
+    mode = isVape(id);
+    box.classList.toggle('vape', mode);
+    chipAt = 0;
+    if (mode) { vape.setDevice(id, tracker.puffsLeft(id)); if (!was) vape.show(); return; }
+    vape.root.visible = false;
+    cig.setBrand(id); pack.swapTo(id, tracker.left(id));
+    if (was && (cig.state === 'out' || stage.target === 0)) relight();
+    else if (was && cig.state === 'fresh') cig.light();
+  }
+
+  const panel = createPanel(root, tracker, { onBrand: (id) => setBrand(id) });
   chip.addEventListener('click', () => panel.toggle());
   let chipAt = 0;
   function syncChip(now) {
     if (now - chipAt < 1000) return;
     chipAt = now;
     const s = tracker.snapshot().session;
+    if (mode) {
+      chip.innerHTML = `<b>${s.puffs}</b> puff${s.puffs === 1 ? '' : 's'} · <b>${s.blinkers}</b> blinker${s.blinkers === 1 ? '' : 's'} · <b>${fmtDur(s.activeMs)}</b> · <b>${tracker.puffsLeft().toLocaleString()}</b> left`;
+      return;
+    }
     chip.innerHTML = `<b>${s.cigs}</b> cig${s.cigs === 1 ? '' : 's'} · <b>${(s.cigs / 20).toFixed(2)}</b> pk · <b>${fmtDur(s.activeMs)}</b> · <b>${tracker.left()}</b>/20`;
   }
 
@@ -146,6 +175,7 @@ export function mount() {
     light = isLight;
     box.classList.toggle('light', light);
     fx.setDark(light ? 1 : 0);
+    cloud.setLight(light);
   }
   syncTheme();
   setInterval(syncTheme, 2000);
@@ -159,6 +189,7 @@ export function mount() {
     const d = scrollY - lastY; lastY = scrollY;
     pull(d !== 0 ? d : 30);             // 0 = something other than the window scrolled
     tracker.scroll(d);
+    if (mode) vape.feed(d || 30);
   }, { passive: true, capture: true });
 
   // the stub shrinks away, the pack rises, flips open and hands over the next one
@@ -166,9 +197,9 @@ export function mount() {
   function relight() {
     if (fading || pack.busy) return;
     fading = true; stage.target = 0; packK.target = 1;
-    const { left, opened } = tracker.take();
-    pack.take({ left, refill: opened, brand: tracker.brand, onOut: () => {
-      cig.reset(); cig.setBrand(tracker.brand); stage.target = 1;
+    const { left, opened } = tracker.take(tracker.cigBrand);
+    pack.take({ left, refill: opened, brand: tracker.cigBrand, onOut: () => {
+      cig.reset(); cig.setBrand(tracker.cigBrand); stage.target = 1;
       setTimeout(() => { cig.light(); fading = false; persist(); }, 350);
       packK.hideAt = performance.now() + 1200;
     } });
@@ -180,7 +211,7 @@ export function mount() {
     if (e.button !== 0) return;
     e.preventDefault(); hit.setPointerCapture(e.pointerId);
     press = { x: e.clientX, y: e.clientY, moved: false, long: false, from: place() };
-    press.timer = setTimeout(() => { if (press && !press.moved) { press.long = true; cig.stub(); } }, LONG_PRESS);
+    press.timer = setTimeout(() => { if (press && !press.moved && !mode) { press.long = true; cig.stub(); } }, LONG_PRESS);
   });
   hit.addEventListener('pointermove', (e) => {
     if (!press) return;
@@ -197,6 +228,7 @@ export function mount() {
     const p = press; press = null;
     if (p.moved) { const at = place(); custom = { right: innerWidth - at.cx, bottom: at.bottom }; save({ pos: custom }); return; }
     if (p.long || e.type === 'pointercancel') return;
+    if (mode) { panel.open(); return; }
     if (cig.state === 'lit') cig.ash();
     else if (cig.state === 'out') relight();
     else if (cig.state === 'fresh') cig.light();
@@ -212,6 +244,7 @@ export function mount() {
     const s = load(), age = Date.now() - (s.t || 0);
     if (s.state === 'out' && age < RESUME_WINDOW) cig.restore(s.burn, true);
     else if (s.state === 'lit' && age < RESUME_WINDOW && s.burn < L - 0.2) cig.restore(s.burn - IDLE_RATE * age / 1000, false);
+    else if (mode) { stage.k = stage.target = 0; }
     else if (tracker.hand) setTimeout(() => cig.light(), 700);
     else { stage.k = stage.target = 0; setTimeout(relight, 700); }
   }
@@ -229,16 +262,17 @@ export function mount() {
     tracker.flush();
     syncChip(now);
 
-    const out = cig.state === 'out';
-    dim.classList.toggle('on', out || (cig.state === 'stubbing' && cig.impact));
-    hit.title = out ? 'Light another' : '';
+    const out = !mode && cig.state === 'out';
+    dim.classList.toggle('on', out || (!mode && cig.state === 'stubbing' && cig.impact));
+    hit.title = mode ? 'Stats' : out ? 'Light another' : '';
     // nothing moves once it is out and the last smoke has gone
     if (out && cig.wisp < 0.01 && fx.count === 0 && !fading && packK.k < 0.01) { if (asleep) return; asleep = true; }
     else asleep = false;
 
     time += dt; timeU.value = time;
     energy *= Math.exp(-dt / 0.28);
-    cig.update(dt, time, 1 - Math.exp(-energy / 260));
+    const target = 1 - Math.exp(-energy / 260);
+    if (mode) { vape.update(dt, time, target); packK.target = 0; } else cig.update(dt, time, target);
     if (packK.hideAt && now > packK.hideAt && !pack.busy) { packK.target = 0; packK.hideAt = 0; }
     packK.k += (packK.target - packK.k) * (1 - Math.exp(-dt / 0.12));
     pack.root.scale.setScalar(Math.max(1e-3, 0.62 * packK.k));
@@ -246,11 +280,12 @@ export function mount() {
     if (pack.root.visible) pack.update(dt, time);
     stage.k += (stage.target - stage.k) * (1 - Math.exp(-dt / 0.09));
     cig.yawG.scale.setScalar(Math.max(1e-3, stage.k));
-    cig.yawG.visible = stage.k > 0.01;
+    cig.yawG.visible = !mode && stage.k > 0.01;
     fx.update(dt, time);
     renderer.render(scene, camera);
   }
   requestAnimationFrame(frame);
 
-  return (window.__cigOverlay = { cig, fx, pack, tracker, panel, pull, relight, place });
+  if (mode) vape.show();
+  return (window.__cigOverlay = { cig, vape, cloud, fx, pack, tracker, panel, pull, relight, place, setBrand });
 }

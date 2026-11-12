@@ -12,7 +12,9 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/overlay.js", "src/cigarette.js", "src/fx.js", "src/noise.js", "src/pack.js", "src/stats.js", "src/panel.js", "src/brands.js", "vendor/three/build/three.module.js"],
+      "resources": ["src/overlay.js", "src/cigarette.js", "src/fx.js", "src/noise.js", "src/pack.js", "src/stats.js", "src/panel.js", "src/brands.js",
+        "src/vape.js",
+        "src/cloud.js", "vendor/three/build/three.module.js"],
       "matches": ["https://x.com/*", "https://twitter.com/*"]
     }
   ]

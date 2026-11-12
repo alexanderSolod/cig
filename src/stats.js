@@ -1,7 +1,7 @@
 // Smoking ledger: every cigarette taken, every drag, every px scrolled, bucketed by
 // scrolling session, by calendar day and all-time. Lives in localStorage so the X overlay
 // (which runs in x.com's storage) and the demo page each keep their own history.
-import { brand as getBrand } from './brands.js';
+import { brand as getBrand, isVape } from './brands.js';
 
 export const PACK_SIZE = 20;
 const KEY = 'cig:stats:v1';
@@ -9,7 +9,7 @@ const SESSION_GAP = 20 * 60e3;        // this long without activity ends a scrol
 const MAX_SESSIONS = 80;
 const MAX_DAYS = 400;
 
-const FIELDS = ['cigs', 'packs', 'drags', 'pops', 'smoked', 'tar', 'nic', 'co', 'activeMs', 'scrollPx'];
+const FIELDS = ['cigs', 'packs', 'drags', 'pops', 'smoked', 'tar', 'nic', 'co', 'activeMs', 'scrollPx', 'puffs', 'blinkers', 'vapeMs', 'devices'];
 export const blank = () => Object.fromEntries(FIELDS.map((f) => [f, 0]));
 export const dayKey = (t = Date.now()) => {
   const d = new Date(t);
@@ -17,7 +17,7 @@ export const dayKey = (t = Date.now()) => {
 };
 
 function fresh() {
-  return { v: 1, brand: 'classic', packs: {}, hand: null, total: blank(), days: {}, sessions: [], brands: {}, settings: { price: 12 } };
+  return { v: 1, brand: 'classic', packs: {}, vapes: {}, cigBrand: null, hand: null, total: blank(), days: {}, sessions: [], brands: {}, settings: { price: 12 } };
 }
 
 export class Tracker {
@@ -36,7 +36,7 @@ export class Tracker {
     try { d = JSON.parse(localStorage.getItem(this.key)); } catch { d = null; }
     if (!d || d.v !== 1) return fresh();
     const f = fresh();
-    return { ...f, ...d, total: { ...blank(), ...d.total }, settings: { ...f.settings, ...d.settings } };
+    return { ...f, ...d, vapes: { ...d.vapes }, total: { ...blank(), ...d.total }, settings: { ...f.settings, ...d.settings } };
   }
   _save(d) { try { localStorage.setItem(this.key, JSON.stringify(d)); } catch { /* storage blocked or full */ } }
   // read-modify-write so two tabs don't clobber each other's counts
@@ -77,7 +77,24 @@ export class Tracker {
 
   /* ----------------------------------------------------------------- events */
   get brand() { return this.data.brand; }
-  setBrand(id) { this._mutate((d) => { d.brand = getBrand(id).id; }); }
+  setBrand(id) { this._mutate((d) => { d.brand = getBrand(id).id; if (!isVape(d.brand)) d.cigBrand = d.brand; }); }
+  // the cigarette brand to fall back to while a vape is in hand
+  get cigBrand() { const d = this.data; return isVape(d.brand) ? (d.cigBrand && !isVape(d.cigBrand) ? d.cigBrand : 'classic') : d.brand; }
+  puffsLeft(id = this.brand) { const n = this.data.vapes[id]; return n == null ? getBrand(id).puffs : n; }
+
+  // one puff on a disposable; an empty one is thrown away and a fresh one opened
+  hit({ ms = 0, blinker = false } = {}, id = this.brand) {
+    const b = getBrand(id);
+    this.flush(true);
+    return this._mutate((d) => {
+      let left = d.vapes[id], opened = false;
+      if (left == null || left <= 0) { left = b.puffs; opened = true; }
+      left -= 1;
+      d.vapes[id] = left;
+      this._add(d, { puffs: 1, blinkers: blinker ? 1 : 0, vapeMs: ms, nic: b.nic, devices: opened ? 1 : 0 });
+      return { left, opened };
+    });
+  }
 
   // cigarettes left in the current pack of a brand (an unopened pack counts as full)
   left(id = this.brand) { const n = this.data.packs[id]; return n == null ? PACK_SIZE : n; }
@@ -139,6 +156,6 @@ export class Tracker {
     const today = plus(d.days[dayKey(now)]);
     const total = plus(d.total);
     const sessions = d.sessions.slice(0, live ? -1 : undefined).concat([session]).reverse();
-    return { session, today, total, days: d.days, sessions, brands: d.brands, settings: d.settings, brand: d.brand, packs: d.packs };
+    return { session, today, total, days: d.days, sessions, brands: d.brands, settings: d.settings, brand: d.brand, packs: d.packs, vapes: d.vapes };
   }
 }
