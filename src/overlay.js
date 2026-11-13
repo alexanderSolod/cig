@@ -6,7 +6,7 @@ import { createFx } from './fx.js';
 import { Pack } from './pack.js';
 import { Tracker } from './stats.js';
 import { createPanel, fmtDur } from './panel.js';
-import { isVape } from './brands.js';
+import { BRANDS, isVape, brand as getBrand } from './brands.js';
 import { Vape } from './vape.js';
 import { createCloud } from './cloud.js';
 
@@ -44,6 +44,19 @@ canvas.fade { opacity: 0; }
 .box.light .chip b { color: #000; }
 .box.vape .hit { width: 150px; height: 200px; left: ${(BOX_W - 150) / 2}px; bottom: ${ORIGIN_UP - 80}px; border-radius: 28px; }
 .box.vape .chip { bottom: ${ORIGIN_UP + 128}px; }
+.bar { position: absolute; left: 50%; bottom: ${ORIGIN_UP + HIT_H / 2 + 38}px; transform: translateX(-50%); display: flex; align-items: center; gap: 4px;
+  pointer-events: auto; opacity: 0; transition: opacity .2s ease; white-space: nowrap;
+  font: 600 10.5px/1 ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+.box.vape .bar { bottom: ${ORIGIN_UP + 160}px; }
+.box:has(.hit:hover, .chip:hover, .bar:hover) .bar, .bar.show, .bar:focus-within { opacity: 1; }
+.bar button, .bar span { color: rgba(255,255,255,.8); background: rgba(20,20,22,.78); border: 1px solid rgba(255,255,255,.14); border-radius: 999px;
+  padding: 6px 9px; font: inherit; letter-spacing: inherit; text-transform: inherit; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.bar button { cursor: pointer; }
+.bar button:hover { color: #fff; background: rgba(40,40,44,.9); }
+.bar button[hidden] { display: none; }
+.bar [data-a="pop"] { color: #9ff3d6; border-color: rgba(120,240,200,.45); }
+.box.light .bar button, .box.light .bar span { color: rgba(0,0,0,.7); background: rgba(255,255,255,.85); border-color: rgba(0,0,0,.12); }
+.box.light .bar [data-a="pop"] { color: #0b7a5a; border-color: rgba(11,122,90,.4); }
 `;
 
 function load() { try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch { return {}; } }
@@ -55,7 +68,7 @@ export function mount() {
   const host = document.createElement('div');
   host.id = 'cig-overlay';
   const root = host.attachShadow({ mode: 'open' });
-  root.innerHTML = `<style>${CSS}</style><div class="dim"></div><div class="box"><canvas></canvas><div class="hit"></div><button class="chip" title="Stats · tar calculator · brands"></button></div>`;
+  root.innerHTML = `<style>${CSS}</style><div class="dim"></div><div class="box"><canvas></canvas><div class="hit"></div><div class="bar"><button data-a="prev" title="Previous brand (Alt+Shift+B)" aria-label="Previous brand">‹</button><span class="bn"></span><button data-a="next" title="Next brand (Alt+B)" aria-label="Next brand">›</button><button data-a="pop" title="Crush the capsule (Alt+P)" hidden>Pop</button></div><button class="chip" title="Stats · tar calculator · brands (Alt+T)"></button></div>`;
   document.documentElement.appendChild(host);
   const dim = root.querySelector('.dim'), box = root.querySelector('.box');
   const canvas = root.querySelector('canvas'), hit = root.querySelector('.hit'), chip = root.querySelector('.chip');
@@ -121,7 +134,7 @@ export function mount() {
     tracker.setBrand(id);
     mode = isVape(id);
     box.classList.toggle('vape', mode);
-    chipAt = 0;
+    chipAt = 0; labelBrand();
     if (mode) { vape.setDevice(id, tracker.puffsLeft(id)); if (!was) vape.show(); return; }
     vape.root.visible = false;
     cig.setBrand(id);
@@ -132,6 +145,32 @@ export function mount() {
 
   const panel = createPanel(root, tracker, { onBrand: (id) => setBrand(id) });
   chip.addEventListener('click', () => panel.toggle());
+
+  // quick actions: a hover bar plus Alt shortcuts (X already owns the plain letter keys)
+  const bar = root.querySelector('.bar'), popBtn = bar.querySelector('[data-a="pop"]'), brandLabel = bar.querySelector('.bn');
+  let barTimer = 0;
+  function flashBar() { bar.classList.add('show'); clearTimeout(barTimer); barTimer = setTimeout(() => bar.classList.remove('show'), 1600); }
+  function labelBrand() { const b = getBrand(tracker.brand); brandLabel.textContent = b.kind === 'vape' ? b.flavour : b.short; }
+  function cycleBrand(dir) {
+    const i = BRANDS.findIndex((b) => b.id === tracker.brand);
+    setBrand(BRANDS[(i + dir + BRANDS.length) % BRANDS.length].id);
+    if (panel.isOpen) panel.render(true);
+    flashBar();
+  }
+  bar.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-a]')?.dataset.a;
+    if (a === 'prev') cycleBrand(-1); else if (a === 'next') cycleBrand(1); else if (a === 'pop') cig.pop();
+  });
+  addEventListener('keydown', (e) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.repeat) return;
+    const t = e.composedPath()[0];
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    if (e.code === 'KeyP') { if (!mode) cig.pop(); }
+    else if (e.code === 'KeyB') cycleBrand(e.shiftKey ? -1 : 1);
+    else if (e.code === 'KeyT') panel.toggle();
+    else return;
+    e.preventDefault(); e.stopPropagation();
+  }, true);
   let chipAt = 0;
   function syncChip(now) {
     if (now - chipAt < 1000) return;
@@ -262,6 +301,8 @@ export function mount() {
     if (now - lastActive < 2500 && !document.hidden) tracker.active(dt * 1000);
     tracker.flush();
     syncChip(now);
+    const canPop = !mode && cig.canPop;
+    if (popBtn.hidden === canPop) popBtn.hidden = !canPop;
 
     const out = !mode && cig.state === 'out';
     dim.classList.toggle('on', out || (!mode && cig.state === 'stubbing' && cig.impact));
@@ -288,5 +329,6 @@ export function mount() {
   requestAnimationFrame(frame);
 
   if (mode) vape.show();
+  labelBrand();
   return (window.__cigOverlay = { cig, vape, cloud, fx, pack, tracker, panel, pull, relight, place, setBrand });
 }

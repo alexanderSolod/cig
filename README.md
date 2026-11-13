@@ -82,6 +82,12 @@ Then open:
 | Drag it | Move it anywhere (the position is remembered) |
 | Click the pill above it | Stats screen and brand picker |
 | Click the Geek Bar | Stats screen |
+| Hover it: **‹ brand ›** / **Pop** | Switch brand / crush the menthol capsule |
+| **Alt+B** / **Alt+Shift+B** | Next / previous brand, Geek Bar included |
+| **Alt+P** | Pop the menthol capsule |
+| **Alt+T** | Stats screen (**Esc** closes it) |
+
+X already uses the plain letter keys (J/K, L, B, T…), so on X the shortcuts sit on **Alt / Option** and are ignored while you're typing. Swapping brands keeps each brand's own pack count; a cigarette that's already lit just changes brand, and the next one comes out of the new brand's pack.
 
 ## Project layout
 
