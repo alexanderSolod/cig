@@ -2,7 +2,7 @@
 // a tar calculator and the brand picker. Plain DOM so it works in a page or a shadow root.
 import { BRANDS, brand as getBrand, isVape } from './brands.js';
 import { PACK_SIZE, dayKey } from './stats.js';
-import { BLINK_S } from './vape.js';
+import { pace, setPace } from './pace.js';
 import { getShelf, TILE_W, TILE_H } from './packview.js';
 
 const LIFE_MIN_PER_CIG = 20;          // rough published estimate of life lost per cigarette
@@ -78,6 +78,8 @@ const CSS = `
 .cp-brand:hover .cp-left,.cp-brand:focus-visible .cp-left{opacity:1;transform:translate(-50%,0)}
 .cp-vape .cp-left{background:#040406;color:#ffd400;border:1px solid #ffd400;border-radius:8px}
 .cp-bn{font-size:11px;font-weight:700;line-height:1.15}
+.cp-real{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}.cp-real input{width:16px;height:16px;accent-color:currentColor}
+.cp-realp{margin:6px 0 0;font-size:11px;line-height:1.4;opacity:.75}
 .cp-bl{font-size:10px;color:#6d6a62}
 .cp-split{display:flex;height:6px;margin-top:10px;background:#e7e4da}
 .cp-foot{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:end;margin-top:20px}
@@ -207,6 +209,7 @@ export function createPanel(root, tracker, { onBrand, away: awayCtl } = {}) {
           <section class="cp-panel"><h3>Last 14 days</h3><div class="cp-bars"></div><div class="cp-days"></div></section>
           <section class="cp-panel"><h3>Recent sessions</h3><div class="cp-sess"></div></section>
           <section class="cp-panel"><h3>Brand</h3><div class="cp-brands"></div><div class="cp-split"></div></section>
+          <section class="cp-panel"><h3>Pace</h3><label class="cp-real"><input type="checkbox"> <b>Realistic cigs</b></label><p class="cp-realp"></p></section>
         </div>
       </div>
       <div class="cp-foot"><div class="cp-code"></div>
@@ -225,6 +228,8 @@ export function createPanel(root, tracker, { onBrand, away: awayCtl } = {}) {
 
   scrim.addEventListener('pointerdown', (e) => { if (e.target === scrim) close(); });
   $('.cp-x').addEventListener('click', () => close());
+  setPace(!!tracker.snapshot().settings.realistic);
+  $('.cp-real input').addEventListener('change', (e) => { tracker.setSetting('realistic', e.target.checked); setPace(e.target.checked); render(); });
   $('.cp-away').hidden = !awayCtl;
   $('.cp-away').addEventListener('click', () => { awayCtl.toggle(); render(); });
   $$('[data-tab]').forEach((b) => b.addEventListener('click', () => { tab = b.dataset.tab; render(); }));
@@ -325,7 +330,7 @@ export function createPanel(root, tracker, { onBrand, away: awayCtl } = {}) {
     card.style.setProperty('--bg', b.pack.bg); card.style.setProperty('--bg2', b.pack.bg2 || b.pack.bg);
     card.style.setProperty('--ink', b.pack.ink); card.style.setProperty('--word', WORD[b.pack.style] || WORD.roof);
     $('.cp-fine-t').textContent = vape
-      ? `${b.puffs.toLocaleString()} puffs · ${b.ml} mL · ${b.nicPct}% nicotine · 650 mAh · dual mesh coil. Hold a draw ${BLINK_S} s and it blinks. Estimates only, not medical advice. `
+      ? `${b.puffs.toLocaleString()} puffs · ${b.ml} mL · ${b.nicPct}% nicotine · 650 mAh · dual mesh coil. Hold a draw ${pace.blink} s and it blinks. Estimates only, not medical advice. `
       : 'Made by your thumb under licence from the feed. Figures are estimates from brand averages; life cost uses a rough 20 minutes per cigarette and is not medical advice. ';
     if (vape) return renderVape(snap, s, b, span, m);
     $('.cp-word').textContent = b.name;
@@ -367,7 +372,7 @@ export function createPanel(root, tracker, { onBrand, away: awayCtl } = {}) {
     const row = (k, v, note, hi) => `<tr${hi ? ' class="hi"' : ''}><td>${k}${note ? `<small>${note}</small>` : ''}</td><td>${v}</td></tr>`;
     $('.cp-tbl').innerHTML = [
       row('Puffs', puffs.toLocaleString(), puffs ? `${(ms / puffs / 1000).toFixed(1)} s average draw` : 'scroll to take a hit', 1),
-      row('Blinkers', blinks, puffs ? `${Math.round((100 * blinks) / puffs)}% of puffs held ${BLINK_S} s` : '', 1),
+      row('Blinkers', blinks, puffs ? `${Math.round((100 * blinks) / puffs)}% of puffs held ${pace.blink} s` : '', 1),
       row('Nicotine', fmtMg(s.nic), s.nic ? `about ${(s.nic / 0.8).toFixed(1)} cigarettes’ worth by label` : '', 1),
       row('E-liquid', `${((puffs * b.ml) / b.puffs).toFixed(2)} mL`),
       row('Devices', s.devices || 0, 'opened'),
@@ -465,6 +470,10 @@ export function createPanel(root, tracker, { onBrand, away: awayCtl } = {}) {
     const was = vape;
     vape = isVape(snap.brand);
     $('.cp-card').classList.toggle('cp-vape', vape);
+    $('.cp-real input').checked = pace.realistic;
+    $('.cp-realp').textContent = pace.realistic
+      ? 'On: everything lasts longer, at real-world pace. A cigarette takes about 5 min of scrolling (about 10 puffs, like a real one); a blinker is an 8 s draw.'
+      : 'Turn on to make everything last longer, at real-world pace: about 5 min of scrolling per cigarette and an 8 s blinker, instead of about 20 s and 5 s.';
     if (awayCtl) $('.cp-away').textContent = awayCtl.get() ? 'Bring it back' : 'Put it away';
     if (was !== vape) full = true;
     $$('[data-tab]').forEach((b) => { b.classList.toggle('on', b.dataset.tab === tab); b.setAttribute('aria-selected', b.dataset.tab === tab); });

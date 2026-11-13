@@ -46,7 +46,7 @@ Then open:
   - Kretek Clove
 - **Geek Bar Pulse** (Fcuking Fab, Blue Razz Ice):
   - Scrolling is a draw. Stop and you exhale a GPU fluid-sim cloud across the screen, sized by how much you scrolled.
-  - Eight seconds of non-stop scrolling hits a **blinker**: the screen flashes, it cuts off, and you get the biggest cloud.
+  - Five seconds of non-stop scrolling (eight with Realistic cigs on) hits a **blinker**: the screen flashes, it cuts off, and you get the biggest cloud.
   - 15,000 puffs a device, with battery and e-liquid on its screen.
 - **Stats screen**, laid out like the back of whichever pack you're holding (or styled like the Geek Bar's screen when you're vaping):
   - This session, today and all time
@@ -56,6 +56,17 @@ Then open:
   - A gap of more than 20 minutes starts a new scrolling session.
   - Everything is stored in `localStorage` and never leaves your browser.
   - The extension and the demo keep separate histories.
+
+## Realistic cigs
+
+The stats screen has a **Realistic cigs** switch under *Pace*. It makes everything last longer, at real-world pace:
+
+| | Default | Realistic cigs |
+| --- | --- | --- |
+| One cigarette, steady scrolling | ~20 s | ~5 min (about 10 puffs, like a real one) |
+| Left burning untouched | ~7 min | ~10 min |
+| Geek Bar blinker | 5 s draw | 8 s draw |
+| A pause that ends a hit | 0.4 s | 0.9 s |
 
 ## Controls
 

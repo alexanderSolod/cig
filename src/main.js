@@ -225,7 +225,7 @@ function syncUi() {
   shown = key;
   for (const b of [btn.light, btn.ash, btn.stub]) b.hidden = mode;
   btn.drag.textContent = mode ? 'Hit' : 'Drag';
-  btn.drag.title = mode ? 'Hold, or keep scrolling. Eight seconds straight is a blinker' : 'Hold — or scroll / hold Space';
+  btn.drag.title = mode ? 'Hold, or keep scrolling. Hold it (5 s, or 8 s on realistic) for a blinker' : 'Hold — or scroll / hold Space';
   btn.stats.title = mode ? 'T, or click the Geek Bar. B cycles brands' : 'T — or click the pack. B cycles brands';
   if (mode) { btn.drag.disabled = false; return; }
   const lit = shown === 'lit';

@@ -28,6 +28,7 @@
         "src/brands.js",
         "src/vape.js",
         "src/cloud.js",
+        "src/pace.js",
         "src/packview.js",
         "vendor/three/build/three.module.js"
       ],

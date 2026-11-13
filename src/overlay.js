@@ -1,6 +1,7 @@
 // The cigarette as a floating layer over a web page (X / Twitter).
 // No addons and no import map here, so it can be loaded straight from an extension.
 import * as THREE from '../vendor/three/build/three.module.js';
+import { pace } from './pace.js';
 import { Cigarette, L } from './cigarette.js';
 import { createFx } from './fx.js';
 import { Pack } from './pack.js';
@@ -17,7 +18,6 @@ const HIT_W = 230, HIT_H = 84;
 const LONG_PRESS = 550;               // ms
 const SAVE_KEY = 'cig:v1';
 const RESUME_WINDOW = 20 * 60e3;      // a lit cigarette left longer than this is gone
-const IDLE_RATE = 0.0085;             // keep in step with cigarette.js
 
 const CSS = `
 :host { all: initial; }
@@ -298,7 +298,7 @@ export function mount() {
   {
     const s = load(), age = Date.now() - (s.t || 0);
     if (s.state === 'out' && age < RESUME_WINDOW) cig.restore(s.burn, true);
-    else if (s.state === 'lit' && age < RESUME_WINDOW && s.burn < L - 0.2) cig.restore(s.burn - IDLE_RATE * age / 1000, false);
+    else if (s.state === 'lit' && age < RESUME_WINDOW && s.burn < L - 0.2) cig.restore(s.burn - pace.idle * age / 1000, false);
     else if (mode) { stage.k = stage.target = 0; }
     else if (tracker.hand) setTimeout(() => cig.light(), 700);
     else { stage.k = stage.target = 0; setTimeout(relight, 700); }

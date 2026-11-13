@@ -1,13 +1,12 @@
 // Geek Bar Pulse–style disposable: soft-touch box in a flavour gradient, a glass side screen
 // (battery, e-liquid, puff animation) and a clear mouthpiece. Scrolling is a draw. Keep it up
-// for BLINK_S and the device cuts off and flashes (a blinker); letting go exhales a cloud sized
+// for pace.blink seconds and the device cuts off and flashes (a blinker); letting go exhales a cloud sized
 // by how much you scrolled.
 import * as THREE from '../vendor/three/build/three.module.js';
+import { pace } from './pace.js';
 import { brand as getBrand } from './brands.js';
 
 export const W = 5.26, H = 8.26, D = 2.77;   // cm, Geek Bar Pulse is 52.6 × 82.6 × 27.7 mm
-export const BLINK_S = 8;                    // continuous draw before the auto cut-off (real puffs average ~3 s; disposables cut off around 8–10 s)
-const GAP_S = 0.9;                           // a pause this long ends a draw
 const HOLD_PX = 800;                         // px-equivalent per second while the Hit button is held
 const BEV = 0.42, CORNER = 0.55;
 const REST_YAW = 0.62;                       // screen side towards you
@@ -261,7 +260,7 @@ export class Vape {
     this.drawing = false; this.drawT = 0; this.charge = 0;
     if (blinker) { this.blinkT = 1; this.needRelease = true; }
     this._emit('hit', { ms, px, blinker });
-    const amount = Math.min(3, px / 2400 + (ms / 1000 / BLINK_S) * 0.6);
+    const amount = Math.min(3, px / 2400 + (ms / 1000 / pace.blink) * 0.6);
     this.exhaleQ.push({ at: this.clock + (blinker ? 0.95 : 0.35), amount, ms, blinker });
   }
 
@@ -272,10 +271,10 @@ export class Vape {
       if (!this.drawing) { this.drawing = true; this.drawT = 0; this.charge = 0; }
       this.drawT += dt; this.gap = 0;
       this.charge += this.fed + hold * HOLD_PX * dt;
-      if (this.drawT >= BLINK_S) this._end(true);
+      if (this.drawT >= pace.blink) this._end(true);
     } else if (this.drawing) {
       this.gap += dt; this.charge += this.fed;
-      if (this.gap > GAP_S) this._end(false);
+      if (this.gap > pace.gap) this._end(false);
     }
     this.fed = 0;
     if (this.drawing || hold) this.awakeT = this.clock;
@@ -303,7 +302,7 @@ export class Vape {
       this.screenAt = this.clock;
       drawScreen(this.screen.g, 192, 640, {
         glow: this.glow, batt: this.battery, liquid: this.liquid, drawing: this.drawing, t,
-        draw: Math.min(1, this.drawT / BLINK_S), charge: this.drawing ? this.drawT / BLINK_S : 0, flash: flashing ? 0.85 : 0,
+        draw: Math.min(1, this.drawT / pace.blink), charge: this.drawing ? this.drawT / pace.blink : 0, flash: flashing ? 0.85 : 0,
       });
       this.screen.t.needsUpdate = true;
     }
