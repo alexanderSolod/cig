@@ -5,17 +5,35 @@
   "description": "Scrolling Twitter is a cigarette for your eyes. One burns down as you scroll.",
   "content_scripts": [
     {
-      "matches": ["https://x.com/*", "https://twitter.com/*"],
-      "js": ["ext/loader.js"],
+      "matches": [
+        "https://x.com/*",
+        "https://twitter.com/*"
+      ],
+      "js": [
+        "ext/loader.js"
+      ],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/overlay.js", "src/cigarette.js", "src/fx.js", "src/noise.js", "src/pack.js", "src/stats.js", "src/panel.js", "src/brands.js",
+      "resources": [
+        "src/overlay.js",
+        "src/cigarette.js",
+        "src/fx.js",
+        "src/noise.js",
+        "src/pack.js",
+        "src/stats.js",
+        "src/panel.js",
+        "src/brands.js",
         "src/vape.js",
-        "src/cloud.js", "vendor/three/build/three.module.js"],
-      "matches": ["https://x.com/*", "https://twitter.com/*"]
+        "src/cloud.js",
+        "vendor/three/build/three.module.js"
+      ],
+      "matches": [
+        "https://x.com/*",
+        "https://twitter.com/*"
+      ]
     }
   ]
 }
