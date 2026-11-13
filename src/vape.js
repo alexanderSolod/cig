@@ -261,8 +261,8 @@ export class Vape {
     this.drawing = false; this.drawT = 0; this.charge = 0;
     if (blinker) { this.blinkT = 1; this.needRelease = true; }
     this._emit('hit', { ms, px, blinker });
-    const amount = Math.min(3, px / 2400 + (ms / 1000 / BLINK_S) * 0.6) * (blinker ? 1.5 : 1);
-    this.exhaleQ.push({ at: this.clock + (blinker ? 0.95 : 0.35), amount, ms });
+    const amount = Math.min(3, px / 2400 + (ms / 1000 / BLINK_S) * 0.6);
+    this.exhaleQ.push({ at: this.clock + (blinker ? 0.95 : 0.35), amount, ms, blinker });
   }
 
   update(dt, t, target, hold = 0) {
@@ -283,7 +283,7 @@ export class Vape {
     // the exhale comes out of you, but a little vapour curls off the mouthpiece too
     while (this.exhaleQ.length && this.exhaleQ[0].at <= this.clock) {
       const e = this.exhaleQ.shift();
-      this._emit('exhale', e.amount);
+      this._emit('exhale', e.amount, e.blinker);
       const p = this.tiltG.localToWorld(this.mouth.clone());
       const n = Math.round(10 + 14 * e.amount);
       for (let i = 0; i < n; i++) this.fx.smoke.spawn(p.x + rnd(-0.2, 0.2), p.y, p.z + rnd(-0.2, 0.2), rnd(-0.8, 0.8), rnd(0.8, 2.4), rnd(-0.8, 0.8), rnd(1.6, 3), rnd(0.3, 0.6), rnd(2, 3.6), rnd(0.05, 0.09), 0, 0, 0);

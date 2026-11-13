@@ -118,6 +118,16 @@ export class Tracker {
   }
   // a taken but unlit cigarette survives a reload; once lit it is spent
   get hand() { return this.data.hand; }
+  // an unlit cigarette goes back in its pack (switching brands before lighting it)
+  putBack(id) {
+    this._mutate((d) => {
+      if (!d.hand || d.hand.brand !== id || d.packs[id] == null || d.packs[id] >= PACK_SIZE) return;
+      d.packs[id] += 1; d.hand = null;
+      d.brands[id] = Math.max(0, (d.brands[id] || 0) - 1);
+      const s = this._add(d, { cigs: -1 });
+      if (s.brands[id]) s.brands[id] -= 1;
+    });
+  }
   clearHand() { if (this.data.hand) this._mutate((d) => { d.hand = null; }); }
 
   drag() { this.pending.drags += 1; }

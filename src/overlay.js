@@ -37,7 +37,7 @@ canvas.fade { opacity: 0; }
 .chip { position: absolute; left: 50%; bottom: ${ORIGIN_UP + HIT_H / 2 + 6}px; transform: translateX(-50%); pointer-events: auto; cursor: pointer;
   font: 600 10.5px/1 ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif; letter-spacing: .06em; text-transform: uppercase;
   white-space: nowrap; color: rgba(255,255,255,.72); background: rgba(20,20,22,.72); border: 1px solid rgba(255,255,255,.12);
-  border-radius: 999px; padding: 6px 10px; opacity: .55; transition: opacity .2s ease; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  border-radius: 999px; padding: 6px 10px; opacity: 0; transition: opacity .2s ease; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .chip:hover { opacity: 1; }
 .chip b { color: #fff; font-variant-numeric: tabular-nums; }
 .box.light .chip { color: rgba(0,0,0,.6); background: rgba(255,255,255,.8); border-color: rgba(0,0,0,.1); }
@@ -48,7 +48,7 @@ canvas.fade { opacity: 0; }
   pointer-events: auto; opacity: 0; transition: opacity .2s ease; white-space: nowrap;
   font: 600 10.5px/1 ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif; letter-spacing: .06em; text-transform: uppercase; }
 .box.vape .bar { bottom: ${ORIGIN_UP + 160}px; }
-.box:has(.hit:hover, .chip:hover, .bar:hover) .bar, .bar.show, .bar:focus-within { opacity: 1; }
+.box:has(.hit:hover, .chip:hover, .bar:hover) .bar, .box:has(.hit:hover, .chip:hover, .bar:hover) .chip, .box.peek .bar, .box.peek .chip, .bar.show, .bar:focus-within, .chip:focus-visible { opacity: 1; }
 .bar button, .bar span { color: rgba(255,255,255,.8); background: rgba(20,20,22,.78); border: 1px solid rgba(255,255,255,.14); border-radius: 999px;
   padding: 6px 9px; font: inherit; letter-spacing: inherit; text-transform: inherit; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .bar button { cursor: pointer; }
@@ -118,7 +118,7 @@ export function mount() {
 
   // the pack only shows up to hand over the next one
   const pack = new Pack(scene, tracker.cigBrand, tracker.left(tracker.cigBrand));
-  pack.root.position.set(0, 5.6, -1.5); pack.yaw = 0.35;
+  pack.root.position.set(0, 6.8, -1.5); pack.yaw = 0.35;
   const packK = { k: 0, target: 0, hideAt: 0 };
   const stage = { k: 1, target: 1 };
 
@@ -128,7 +128,7 @@ export function mount() {
   box.classList.toggle('vape', mode);
   const cloud = createCloud(root, { before: box });
   vape.on('hit', (h) => { const { left, opened } = tracker.hit(h, vape.brand.id); vape.setLeft(left, opened); });
-  vape.on('exhale', (amount) => cloud.burst(amount));
+  vape.on('exhale', (amount, blinker) => cloud.burst(amount, { blinker }));
   function setBrand(id) {
     const was = mode;
     tracker.setBrand(id);
@@ -137,10 +137,12 @@ export function mount() {
     chipAt = 0; labelBrand();
     if (mode) { vape.setDevice(id, tracker.puffsLeft(id)); if (!was) vape.show(); return; }
     vape.root.visible = false;
-    cig.setBrand(id);
-    if (was && (cig.state === 'out' || stage.target === 0)) return relight();
-    pack.swapTo(id, tracker.left(id));
-    if (was && cig.state === 'fresh') cig.light();
+    // back from the Geek Bar to the cigarette still burning: carry on with it
+    if (was && cig.brand.id === id && stage.target === 1 && cig.state !== 'out' && cig.state !== 'fresh') return;
+    // otherwise a new brand means a new cigarette out of the new pack
+    if (pack.anim?.kind === 'take') pack._finish();
+    if (!was && cig.state === 'fresh' && stage.target === 1) tracker.putBack(cig.brand.id);
+    relight(true);
   }
 
   const panel = createPanel(root, tracker, { onBrand: (id) => setBrand(id) });
@@ -148,7 +150,8 @@ export function mount() {
 
   // quick actions: a hover bar plus Alt shortcuts (X already owns the plain letter keys)
   const bar = root.querySelector('.bar'), popBtn = bar.querySelector('[data-a="pop"]'), brandLabel = bar.querySelector('.bn');
-  let barTimer = 0;
+  let barTimer = 0, peekTimer = 0;
+  function peekUi() { box.classList.add('peek'); clearTimeout(peekTimer); peekTimer = setTimeout(() => box.classList.remove('peek'), 2500); }
   function flashBar() { bar.classList.add('show'); clearTimeout(barTimer); barTimer = setTimeout(() => bar.classList.remove('show'), 1600); }
   function labelBrand() { const b = getBrand(tracker.brand); brandLabel.textContent = b.kind === 'vape' ? b.flavour : b.short; }
   function cycleBrand(dir) {
@@ -233,14 +236,14 @@ export function mount() {
   }, { passive: true, capture: true });
 
   // the stub shrinks away, the pack rises, flips open and hands over the next one
-  let fading = false;
-  function relight() {
-    if (fading || pack.anim?.kind === 'take') return;
+  let fading = false, relightId = 0;
+  function relight(force = false) {
+    if ((fading && !force) || pack.anim?.kind === 'take') return;
     fading = true; stage.target = 0; packK.target = 1;
-    const { left, opened } = tracker.take(tracker.cigBrand);
-    pack.take({ left, refill: opened, brand: tracker.cigBrand, onOut: () => {
-      cig.reset(); cig.setBrand(tracker.cigBrand); stage.target = 1;
-      setTimeout(() => { cig.light(); fading = false; persist(); }, 350);
+    const run = ++relightId, id = tracker.cigBrand, { left, opened } = tracker.take(id);
+    pack.take({ left, refill: opened, brand: id, onOut: () => {
+      cig.reset(); cig.setBrand(id); stage.target = 1;
+      setTimeout(() => { if (run !== relightId) return; cig.light(); fading = false; persist(); }, 350);
       packK.hideAt = performance.now() + 1200;
     } });
   }
@@ -264,6 +267,7 @@ export function mount() {
   });
   const release = (e) => {
     if (!press) return;
+    peekUi();
     clearTimeout(press.timer); hit.classList.remove('moving');
     const p = press; press = null;
     if (p.moved) { const at = place(); custom = { right: innerWidth - at.cx, bottom: at.bottom }; save({ pos: custom }); return; }
@@ -317,7 +321,7 @@ export function mount() {
     if (mode) { vape.update(dt, time, target); packK.target = 0; } else cig.update(dt, time, target);
     if (packK.hideAt && now > packK.hideAt && !pack.busy) { packK.target = 0; packK.hideAt = 0; }
     packK.k += (packK.target - packK.k) * (1 - Math.exp(-dt / 0.12));
-    pack.root.scale.setScalar(Math.max(1e-3, 0.62 * packK.k));
+    pack.root.scale.setScalar(Math.max(1e-3, 0.85 * packK.k));
     pack.root.visible = packK.k > 0.01;
     if (pack.root.visible) pack.update(dt, time);
     stage.k += (stage.target - stage.k) * (1 - Math.exp(-dt / 0.09));

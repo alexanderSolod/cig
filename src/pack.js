@@ -402,6 +402,7 @@ export class Pack {
         if (a.t > 1.9) this.anim = null;
       }
     }
+    lidTarget = Math.max(lidTarget, this.peek || 0);
     this.lidAngle = damp(this.lidAngle, lidTarget, lidTarget ? 0.12 : 0.18, dt);
     this.lid.rotation.x = -1.95 * this.lidAngle;
 

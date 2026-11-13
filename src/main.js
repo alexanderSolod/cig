@@ -51,7 +51,7 @@ vape.root.position.set(0, 1.3, 0);
 vape.root.visible = mode;
 const cloud = createCloud(document.body, { z: 5 });
 vape.on('hit', (h) => { const { left, opened } = tracker.hit(h, vape.brand.id); vape.setLeft(left, opened); });
-vape.on('exhale', (amount) => cloud.burst(amount));
+vape.on('exhale', (amount, blinker) => cloud.burst(amount, { blinker }));
 
 cig.on('light', () => tracker.clearHand());
 cig.on('drag', () => tracker.drag());
@@ -73,10 +73,10 @@ function resize() {
   baseDist = Math.max(26, 11.5 / (2 * Math.tan(THREE.MathUtils.degToRad(14)) * camera.aspect));
   // the pack sits to the left of the cigarette, or under it on a tall screen
   const halfW = baseDist * Math.tan(THREE.MathUtils.degToRad(14)) * camera.aspect;
-  if (camera.aspect < 1) { pack.root.position.set(0, -3.6, 0); pack.root.scale.setScalar(0.62); pack.yaw = 0.35; }
+  if (camera.aspect < 1) { pack.root.position.set(0, -4.2, 0); pack.root.scale.setScalar(0.82); pack.yaw = 0.35; }
   else {
-    const k = Math.min(0.78, Math.max(0.45, (halfW - 4.7) / 8));
-    pack.root.position.set(-(4.4 + 3.2 * k), 0.7, -0.5); pack.root.scale.setScalar(k); pack.yaw = 0.5;
+    const k = Math.min(0.9, Math.max(0.6, (halfW - 4.2) / 7));
+    pack.root.position.set(-(4.2 + 3.0 * k), 0.8, -0.5); pack.root.scale.setScalar(k); pack.yaw = 0.5;
   }
 }
 addEventListener('resize', resize); resize();
@@ -103,8 +103,8 @@ const stage = { k: 1, target: 1 };
 function takeNew() {
   if (pack.anim?.kind === 'take') return;
   stage.target = 0;
-  const { left, opened } = tracker.take(tracker.cigBrand);
-  pack.take({ left, refill: opened, brand: tracker.cigBrand, onOut: () => { cig.reset(); cig.setBrand(tracker.cigBrand); stage.target = 1; } });
+  const id = tracker.cigBrand, { left, opened } = tracker.take(id);
+  pack.take({ left, refill: opened, brand: id, onOut: () => { cig.reset(); cig.setBrand(id); stage.target = 1; } });
 }
 function lightOrNew() { if (cig.state === 'fresh') cig.light(); else if (cig.state === 'out') takeNew(); }
 function setBrand(id) {
@@ -116,10 +116,15 @@ function setBrand(id) {
     if (!was) vape.show();
   } else {
     vape.root.visible = false;
-    cig.setBrand(id);
     pack.root.visible = true;
-    if (stage.target === 0) takeNew();                // nothing in hand yet: take one from this brand's pack
-    else pack.swapTo(id, tracker.left(id));
+    // back from the Geek Bar to the cigarette still burning: carry on with it
+    const resume = was && cig.brand.id === id && stage.target === 1 && cig.state !== 'out' && cig.state !== 'fresh';
+    if (!resume) {
+      // a new brand means a new cigarette: finish any hand-off, return an unlit one, take one from the new pack
+      if (pack.anim?.kind === 'take') pack._finish();
+      if (!was && cig.state === 'fresh' && stage.target === 1) tracker.putBack(cig.brand.id);
+      takeNew();
+    }
   }
   shown = ''; hudAt = 0;
 }

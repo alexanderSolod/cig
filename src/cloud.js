@@ -200,11 +200,11 @@ function fluidCloud(c) {
     blit(vel.write); vel.swap();
     if (u.dyeTexelSize) gl.uniform2f(u.dyeTexelSize, dye.read.tx, dye.read.ty);
     gl.uniform1i(u.uVelocity, vel.read.attach(0)); gl.uniform1i(u.uSource, dye.read.attach(1));
-    gl.uniform1f(u.dissipation, CFG.densDiss);
+    gl.uniform1f(u.dissipation, CFG.densDiss * (heavy > 0 ? 0.45 : 1));
     blit(dye.write); dye.swap();
   }
 
-  let light = false, emitters = [], raf = 0, last = 0, quietFor = 0;
+  let light = false, emitters = [], raf = 0, last = 0, quietFor = 0, heavy = 0;
   function render() {
     gl.clearColor(0, 0, 0, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -235,7 +235,8 @@ function fluidCloud(c) {
     step(dt);
     render();
     quietFor = emitters.length ? 0 : quietFor + dt;
-    if (quietFor < CFG.linger) raf = requestAnimationFrame(frame);
+    heavy = Math.max(0, heavy - dt);
+    if (quietFor < CFG.linger + (heavy > 0 ? 4 : 0)) raf = requestAnimationFrame(frame);
     else { raf = 0; init(); gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
   }
 
@@ -250,12 +251,16 @@ function fluidCloud(c) {
     kind: 'fluid',
     get active() { return !!raf; },
     setLight(v) { light = !!v; },
-    burst(amount, origin = {}) {
-      const a = Math.max(0.15, Math.min(amount, 4.5)), n = Math.round(10 + 22 * a), dur = 0.4 + 0.45 * Math.min(a, 3);
-      emitters.push({
-        x: origin.x != null ? origin.x / innerWidth : 0.5, total: n, left: n, rate: n / dur, acc: 1,
-        spread: 0.25 + 0.12 * Math.min(a, 3), power: 900 + 420 * Math.min(a, 3), dens: 0.55 + 0.25 * Math.min(a, 3), radius: 0.35 + 0.22 * Math.min(a, 3),
+    // a blinker is about five times the smoke: five streams across the bottom, denser, wider, longer
+    burst(amount, { x, blinker = false } = {}) {
+      const a = Math.max(0.15, Math.min(amount, 4.5)), k = Math.min(a, 3);
+      const xs = blinker ? [0.14, 0.32, 0.5, 0.68, 0.86] : [x != null ? x / innerWidth : 0.5];
+      const boost = blinker ? 1.35 : 1, n = Math.round((10 + 22 * a) * boost), dur = (0.4 + 0.45 * k) * (blinker ? 2 : 1);
+      for (const ex of xs) emitters.push({
+        x: ex, total: n, left: n, rate: n / dur, acc: 1, spread: 0.25 + 0.12 * k,
+        power: (900 + 420 * k) * boost, dens: (0.55 + 0.25 * k) * (blinker ? 1.1 : 1), radius: (0.35 + 0.22 * k) * (blinker ? 1.2 : 1),
       });
+      if (blinker) heavy = 6;
       quietFor = 0;
       if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); }
     },
@@ -340,9 +345,10 @@ function spriteCloud(c) {
     get active() { return !!raf; },
     setLight(v) { light = !!v; },
     // amount ~ 0.2 (quick hit) … 3+ (a blinker after a long scroll)
-    burst(amount, origin = {}) {
-      const a = Math.max(0.15, Math.min(amount, 4.5)), n = Math.round(14 + 36 * a), dur = 0.45 + 0.4 * a;
-      emitters.push({ x: origin.x ?? innerWidth / 2, y: origin.y ?? innerHeight + 60, left: n, rate: n / dur, acc: 1,
+    burst(amount, { x, y, blinker = false } = {}) {
+      const a = Math.max(0.15, Math.min(amount, 4.5)), n = Math.round((14 + 36 * a) * (blinker ? 1.3 : 1)), dur = (0.45 + 0.4 * a) * (blinker ? 1.8 : 1);
+      const xs = blinker ? [0.14, 0.32, 0.5, 0.68, 0.86].map((f) => f * innerWidth) : [x ?? innerWidth / 2];
+      for (const ex of xs) emitters.push({ x: ex, y: y ?? innerHeight + 60, left: n, rate: n / dur, acc: 1,
         spread: 0.35 + 0.16 * Math.min(a, 3), power: 0.7 + 0.22 * Math.min(a, 3), amount: a });
       if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); }
     },

@@ -3,6 +3,7 @@
 import { BRANDS, brand as getBrand, isVape } from './brands.js';
 import { PACK_SIZE, dayKey } from './stats.js';
 import { BLINK_S } from './vape.js';
+import { getShelf, TILE_W, TILE_H } from './packview.js';
 
 const LIFE_MIN_PER_CIG = 20;          // rough published estimate of life lost per cigarette
 const PX_TO_M = 0.0254 / 96;          // CSS px are 1/96 inch
@@ -68,6 +69,12 @@ const CSS = `
 .cp-sw{width:30px;height:44px;border-radius:1.5px;position:relative;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.35)}
 .cp-sw i{position:absolute;left:0;right:0;top:0;height:30%}
 .cp-sw b{position:absolute;left:4px;right:4px;bottom:4px;height:22%;background:#fff;outline:1.5px solid #000;outline-offset:-2px}
+.cp-brand{position:relative}
+.cp-pk{display:block;width:64px;height:84px}
+.cp-left{position:absolute;top:4px;left:50%;transform:translate(-50%,-4px);opacity:0;transition:opacity .15s ease,transform .15s ease;pointer-events:none;
+  background:#151515;color:#fff;font:700 10px/1 "Helvetica Neue",Arial,sans-serif;padding:4px 6px;border-radius:2px;white-space:nowrap}
+.cp-brand:hover .cp-left,.cp-brand:focus-visible .cp-left{opacity:1;transform:translate(-50%,0)}
+.cp-vape .cp-left{background:#040406;color:#ffd400;border:1px solid #ffd400;border-radius:8px}
 .cp-bn{font-size:11px;font-weight:700;line-height:1.15}
 .cp-bl{font-size:10px;color:#6d6a62}
 .cp-split{display:flex;height:6px;margin-top:10px;background:#e7e4da}
@@ -243,20 +250,56 @@ export function createPanel(root, tracker, { onBrand } = {}) {
     return days.length ? days.reduce((a, d) => a + d.cigs, 0) / days.length : 0;
   }
 
+  // brand picker: a 3D pack (or Geek Bar) per brand; hovering opens it to show what's left
+  let tiles = null, animRaf = 0;
+  const ease = (x) => x * x * (3 - 2 * x);
+  const leftOf = (b, snap) => (b.kind === 'vape' ? snap.vapes[b.id] ?? b.puffs : snap.packs[b.id] ?? PACK_SIZE);
+  function animate() {
+    animRaf = 0;
+    let more = false;
+    for (const t of tiles) {
+      const target = t.hover ? 1 : 0;
+      if (t.open === target && !t.dirty && !(t.hover && t.b.kind === 'vape')) continue;
+      t.open += (target - t.open) * 0.2;
+      if (Math.abs(t.open - target) < 0.004) t.open = target;
+      t.dirty = false;
+      getShelf().draw(t.ctx, t.b.id, t.left, ease(t.open));
+      if (t.open !== target || (t.hover && t.b.kind === 'vape')) more = true;
+    }
+    if (more && !scrim.hidden) animRaf = requestAnimationFrame(animate);
+  }
+  const kick = () => { if (!animRaf && tiles) animRaf = requestAnimationFrame(animate); };
+
   function renderBrands(snap) {
-    $('.cp-brands').innerHTML = BRANDS.map((b) => {
-      const v = b.kind === 'vape';
-      const left = v ? `${(snap.vapes[b.id] ?? b.puffs).toLocaleString()} puffs left` : snap.packs[b.id] == null ? 'sealed pack' : `${snap.packs[b.id]} / ${PACK_SIZE} left`;
-      const top = b.pack.style === 'roof' ? b.pack.accent : b.pack.bg2 || b.pack.accent;
-      return `<button class="cp-brand${b.id === snap.brand ? ' on' : ''}" data-brand="${b.id}" title="${esc(b.blurb)}">
-        ${v ? `<div class="cp-sw vape" style="background:linear-gradient(${b.pack.bg},${b.pack.bg2})"><i></i><b></b></div>` : `<div class="cp-sw" style="background:${b.pack.bg}"><i style="background:${top}"></i><b></b></div>`}
-        <div><div class="cp-bn">${esc(v ? `${b.short === 'Geek Bar' ? 'Geek Bar Pulse' : `Geek Bar ${b.short}`}` : b.name)}</div><div class="cp-bl">${left} · ${v ? `${b.nicPct}% nic` : `${b.tar} mg`}</div></div></button>`;
-    }).join('');
-    $$('[data-brand]').forEach((el) => el.addEventListener('click', () => {
-      if (el.dataset.brand === tracker.brand) return;
-      onBrand ? onBrand(el.dataset.brand) : tracker.setBrand(el.dataset.brand);
-      render(true);
-    }));
+    if (!tiles) {
+      $('.cp-brands').innerHTML = BRANDS.map((b) => {
+        const name = b.kind === 'vape' ? (b.short === 'Geek Bar' ? 'Geek Bar Pulse' : `Geek Bar ${b.short}`) : b.name;
+        return `<button class="cp-brand" data-brand="${b.id}" title="${esc(b.blurb)}"><canvas class="cp-pk" width="${TILE_W}" height="${TILE_H}"></canvas>
+          <span class="cp-left"></span><div><div class="cp-bn">${esc(name)}</div><div class="cp-bl"></div></div></button>`;
+      }).join('');
+      tiles = BRANDS.map((b) => {
+        const el = scrim.querySelector(`[data-brand="${b.id}"]`);
+        const t = { b, el, ctx: el.querySelector('canvas').getContext('2d'), open: 0, hover: false, left: -1, dirty: true };
+        const on = () => { t.hover = true; kick(); }, off = () => { t.hover = false; kick(); };
+        el.addEventListener('pointerenter', on); el.addEventListener('pointerleave', off);
+        el.addEventListener('focus', on); el.addEventListener('blur', off);
+        el.addEventListener('click', () => {
+          if (b.id === tracker.brand) return;
+          onBrand ? onBrand(b.id) : tracker.setBrand(b.id);
+          render(true);
+        });
+        return t;
+      });
+    }
+    for (const t of tiles) {
+      const b = t.b, v = b.kind === 'vape', left = leftOf(b, snap);
+      t.el.classList.toggle('on', b.id === snap.brand);
+      if (left !== t.left) { t.left = left; t.dirty = true; }
+      t.el.querySelector('.cp-left').textContent = v ? `${left.toLocaleString()} puffs left` : `${left} of ${PACK_SIZE} left`;
+      const status = v ? `${left.toLocaleString()} puffs` : snap.packs[b.id] == null ? 'sealed' : `${left} / ${PACK_SIZE}`;
+      t.el.querySelector('.cp-bl').textContent = `${status} · ${v ? `${b.nicPct}% nic` : `${b.tar} mg`}`;
+    }
+    kick();
   }
 
   const WORD = { roof: 'Georgia, "Times New Roman", serif', wave: '"Helvetica Neue", Arial, sans-serif', stars: '"Times New Roman", Times, serif',
@@ -439,6 +482,8 @@ export function createPanel(root, tracker, { onBrand } = {}) {
   function close() {
     if (!scrim.classList.contains('on')) return;
     clearInterval(timer);
+    cancelAnimationFrame(animRaf); animRaf = 0;
+    if (tiles) for (const t of tiles) { t.hover = false; t.open = 0; t.dirty = true; }
     removeEventListener('keydown', onEsc, true);
     scrim.classList.remove('on');
     setTimeout(() => { if (!scrim.classList.contains('on')) scrim.hidden = true; }, 200);
