@@ -57,6 +57,9 @@ canvas.fade { opacity: 0; }
 .bar [data-a="pop"] { color: #9ff3d6; border-color: rgba(120,240,200,.45); }
 .box.light .bar button, .box.light .bar span { color: rgba(0,0,0,.7); background: rgba(255,255,255,.85); border-color: rgba(0,0,0,.12); }
 .box.light .bar [data-a="pop"] { color: #0b7a5a; border-color: rgba(11,122,90,.4); }
+.box.away canvas, .box.away .hit, .box.away .bar { visibility: hidden; }
+.box.away .chip { opacity: .45; bottom: ${ORIGIN_UP - 10}px; }
+.box.away .chip:hover { opacity: 1; }
 `;
 
 function load() { try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch { return {}; } }
@@ -68,7 +71,7 @@ export function mount() {
   const host = document.createElement('div');
   host.id = 'cig-overlay';
   const root = host.attachShadow({ mode: 'open' });
-  root.innerHTML = `<style>${CSS}</style><div class="dim"></div><div class="box"><canvas></canvas><div class="hit"></div><div class="bar"><button data-a="prev" title="Previous brand (Alt+Shift+B)" aria-label="Previous brand">‹</button><span class="bn"></span><button data-a="next" title="Next brand (Alt+B)" aria-label="Next brand">›</button><button data-a="pop" title="Crush the capsule (Alt+P)" hidden>Pop</button></div><button class="chip" title="Stats · tar calculator · brands (Alt+T)"></button></div>`;
+  root.innerHTML = `<style>${CSS}</style><div class="dim"></div><div class="box"><canvas></canvas><div class="hit"></div><div class="bar"><button data-a="prev" title="Previous brand (Alt+Shift+B)" aria-label="Previous brand">‹</button><span class="bn"></span><button data-a="next" title="Next brand (Alt+B)" aria-label="Next brand">›</button><button data-a="pop" title="Crush the capsule (Alt+P)" hidden>Pop</button><button data-a="away" title="Put it away, pauses tracking (Alt+H)">Hide</button></div><button class="chip" title="Stats · tar calculator · brands (Alt+T)"></button></div>`;
   document.documentElement.appendChild(host);
   const dim = root.querySelector('.dim'), box = root.querySelector('.box');
   const canvas = root.querySelector('canvas'), hit = root.querySelector('.hit'), chip = root.querySelector('.chip');
@@ -145,8 +148,14 @@ export function mount() {
     relight(true);
   }
 
-  const panel = createPanel(root, tracker, { onBrand: (id) => setBrand(id) });
-  chip.addEventListener('click', () => panel.toggle());
+  let away = !!load().away;             // put away: hidden, nothing tracked
+  box.classList.toggle('away', away);
+  function setAway(v) {
+    away = v; save({ away: v }); box.classList.toggle('away', v); chipAt = 0;
+    if (v) dim.classList.remove('on'); else lastY = scrollY;
+  }
+  const panel = createPanel(root, tracker, { onBrand: (id) => setBrand(id), away: { get: () => away, toggle: () => setAway(!away) } });
+  chip.addEventListener('click', () => (away ? setAway(false) : panel.toggle()));
 
   // quick actions: a hover bar plus Alt shortcuts (X already owns the plain letter keys)
   const bar = root.querySelector('.bar'), popBtn = bar.querySelector('[data-a="pop"]'), brandLabel = bar.querySelector('.bn');
@@ -162,7 +171,7 @@ export function mount() {
   }
   bar.addEventListener('click', (e) => {
     const a = e.target.closest('[data-a]')?.dataset.a;
-    if (a === 'prev') cycleBrand(-1); else if (a === 'next') cycleBrand(1); else if (a === 'pop') cig.pop();
+    if (a === 'prev') cycleBrand(-1); else if (a === 'next') cycleBrand(1); else if (a === 'pop') cig.pop(); else if (a === 'away') setAway(true);
   });
   addEventListener('keydown', (e) => {
     if (!e.altKey || e.ctrlKey || e.metaKey || e.repeat) return;
@@ -171,6 +180,7 @@ export function mount() {
     if (e.code === 'KeyP') { if (!mode) cig.pop(); }
     else if (e.code === 'KeyB') cycleBrand(e.shiftKey ? -1 : 1);
     else if (e.code === 'KeyT') panel.toggle();
+    else if (e.code === 'KeyH') setAway(!away);
     else return;
     e.preventDefault(); e.stopPropagation();
   }, true);
@@ -178,6 +188,7 @@ export function mount() {
   function syncChip(now) {
     if (now - chipAt < 1000) return;
     chipAt = now;
+    if (away) { chip.textContent = 'Put away · bring it back'; return; }
     const s = tracker.snapshot().session;
     if (mode) {
       chip.innerHTML = `<b>${s.puffs}</b> puff${s.puffs === 1 ? '' : 's'} · <b>${s.blinkers}</b> blinker${s.blinkers === 1 ? '' : 's'} · <b>${fmtDur(s.activeMs)}</b> · <b>${tracker.puffsLeft().toLocaleString()}</b> left`;
@@ -228,7 +239,7 @@ export function mount() {
   let energy = 0, lastY = scrollY, lastActive = -1e9;
   function pull(px) { energy = Math.min(energy + Math.min(Math.abs(px), 160), 900); lastActive = performance.now(); }
   document.addEventListener('scroll', () => {
-    if (panel.isOpen) return;
+    if (panel.isOpen || away) { lastY = scrollY; return; }
     const d = scrollY - lastY; lastY = scrollY;
     pull(d !== 0 ? d : 30);             // 0 = something other than the window scrolled
     tracker.scroll(d);
@@ -302,11 +313,12 @@ export function mount() {
     const dt = Math.min((now - last) / 1000, 1 / 24);
     last = now;
 
-    if (now - lastActive < 2500 && !document.hidden) tracker.active(dt * 1000);
+    if (!away && now - lastActive < 2500 && !document.hidden) tracker.active(dt * 1000);
     tracker.flush();
     syncChip(now);
     const canPop = !mode && cig.canPop;
     if (popBtn.hidden === canPop) popBtn.hidden = !canPop;
+    if (away) return;                   // frozen where you left it
 
     const out = !mode && cig.state === 'out';
     dim.classList.toggle('on', out || (!mode && cig.state === 'stubbing' && cig.impact));

@@ -70,6 +70,7 @@ Then open:
 | **P** | Pop the menthol capsule |
 | **B** / **Shift+B** | Next / previous brand, Geek Bar included |
 | **T**, or click the pack / Geek Bar | Stats screen (**Esc** closes it) |
+| **H**, or Stats → **Put it away** | Hide it and pause all tracking; press again (or **Bring it back**) to carry on where you left off |
 | Drag on the cigarette | Spin it |
 
 **On X**
@@ -86,6 +87,7 @@ Then open:
 | **Alt+B** / **Alt+Shift+B** | Next / previous brand, Geek Bar included |
 | **Alt+P** | Pop the menthol capsule |
 | **Alt+T** | Stats screen (**Esc** closes it) |
+| Hover: **Hide**, **Alt+H**, or Stats → **Put it away** | Hide it and pause tracking; click the small pill left behind (or **Alt+H**) to bring it back |
 
 X already uses the plain letter keys (J/K, L, B, T…), so on X the shortcuts sit on **Alt / Option** and are ignored while you're typing. Swapping brands keeps each brand's own pack count; a cigarette that's already lit just changes brand, and the next one comes out of the new brand's pack.
 

@@ -86,7 +86,15 @@ const input = { hold: 0, energy: 0 };
 const $ = (id) => document.getElementById(id);
 const btn = { light: $('light'), drag: $('drag'), ash: $('ash'), stub: $('stub'), pop: $('pop'), stats: $('stats') };
 const hud = $('hud');
-const panel = createPanel(document, tracker, { onBrand: setBrand });
+let away = localStorage.getItem('cig:away') === '1';   // put away: hidden, nothing tracked
+const panel = createPanel(document, tracker, { onBrand: setBrand, away: { get: () => away, toggle: () => setAway(!away) } });
+function setAway(v) {
+  away = v;
+  try { localStorage.setItem('cig:away', v ? '1' : '0'); } catch { /* storage blocked */ }
+  if (!v) { if (mode) vape.root.visible = true; else pack.root.visible = true; }
+  document.getElementById('ui').hidden = v;
+  shown = ''; hudAt = 0;
+}
 let lastActive = -1e9;
 
 // scrolling = dragging on it. Wheel energy leaks away, so the pull follows the scroll.
@@ -94,6 +102,7 @@ function pull(px) { input.energy = Math.min(input.energy + Math.min(Math.abs(px)
 addEventListener('wheel', (e) => {
   e.preventDefault();
   const px = e.deltaY * (e.deltaMode === 1 ? 16 : 1);
+  if (away) return;
   pull(px); tracker.scroll(px);
   if (mode) vape.feed(px);
 }, { passive: false });
@@ -146,6 +155,7 @@ for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) btn.drag.
 addEventListener('keydown', (e) => {
   if (e.repeat || e.metaKey || e.ctrlKey) return;
   if (e.code === 'KeyT') return panel.toggle();
+  if (e.code === 'KeyH') return setAway(!away);
   if (panel.isOpen) return;
   if (e.code === 'Space') { e.preventDefault(); holdOn(); }
   else if (e.code === 'KeyB') cycleBrand(e.shiftKey ? -1 : 1);
@@ -197,6 +207,7 @@ let hudAt = 0;
 function syncHud(now) {
   if (now - hudAt < 400) return;
   hudAt = now;
+  if (away) { hud.innerHTML = 'Put away · nothing is being tracked<span>H, or Stats → Bring it back</span>'; return; }
   const s = tracker.snapshot().session, b = getBrand(tracker.brand);
   if (mode) {
     hud.innerHTML = `<b>${s.puffs}</b> puff${s.puffs === 1 ? '' : 's'} · <b>${s.blinkers}</b> blinker${s.blinkers === 1 ? '' : 's'} · <b>${fmtDur(s.activeMs)}</b> scrolling · <b>${s.nic.toFixed(1)}</b> mg nicotine`
@@ -233,7 +244,8 @@ function frame(now) {
 
   input.energy *= Math.exp(-dt / 0.28);
   const target = Math.max(input.hold, 1 - Math.exp(-input.energy / 260));
-  if (mode) {
+  if (away) { cig.yawG.visible = false; vape.root.visible = false; pack.root.visible = false; }
+  else if (mode) {
     vape.update(dt, time, target, input.hold);
     cig.yawG.visible = false; pack.root.visible = false;
   } else {
@@ -245,7 +257,7 @@ function frame(now) {
   }
   fx.update(dt, time);
 
-  if (now - lastActive < 2500 && !document.hidden) tracker.active(dt / sim.speed * 1000);
+  if (!away && now - lastActive < 2500 && !document.hidden) tracker.active(dt / sim.speed * 1000);
   tracker.flush();
   syncHud(now);
 
@@ -260,6 +272,7 @@ function frame(now) {
   composer.render();
 }
 requestAnimationFrame(frame);
+if (away) setAway(true);
 addEventListener('pagehide', () => tracker.flush(true));
 
 // first visit: shake one out of the pack; a taken-but-unlit one survives a reload

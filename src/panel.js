@@ -26,6 +26,7 @@ const CSS = `
 .cp-tabs{display:flex;gap:16px;flex:1}
 .cp-tabs button{opacity:.55;padding-bottom:2px;border-bottom:1.5px solid transparent;letter-spacing:inherit;text-transform:inherit}
 .cp-tabs button.on{opacity:1;border-color:currentColor}
+.cp-away{opacity:.7;margin-right:6px}.cp-away:hover{opacity:1}.cp-away[hidden]{display:none}
 .cp-x{opacity:.7}.cp-x:hover,.cp-tabs button:hover{opacity:1}
 .cp-body{padding:18px 22px 20px}
 .cp-mast{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -174,7 +175,7 @@ function capsule(dev) {
     <text x="22" y="106" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">×${dev.toFixed(dev < 10 ? 1 : 0)}</text></svg>`;
 }
 
-export function createPanel(root, tracker, { onBrand } = {}) {
+export function createPanel(root, tracker, { onBrand, away: awayCtl } = {}) {
   const style = document.createElement('style');
   style.textContent = CSS;
   (root instanceof ShadowRoot ? root : document.head).appendChild(style);
@@ -186,7 +187,7 @@ export function createPanel(root, tracker, { onBrand } = {}) {
         <button data-tab="session" role="tab">This session</button>
         <button data-tab="today" role="tab">Today</button>
         <button data-tab="total" role="tab">All time</button>
-      </div><button class="cp-x" title="Close (Esc)">Close</button></div>
+      </div><button class="cp-away" title="Hide it and pause tracking"></button><button class="cp-x" title="Close (Esc)">Close</button></div>
     <div class="cp-body">
       <div class="cp-mast"><div class="cp-word"></div><div class="cp-count"></div></div>
       <div class="cp-warn" role="status"></div>
@@ -224,6 +225,8 @@ export function createPanel(root, tracker, { onBrand } = {}) {
 
   scrim.addEventListener('pointerdown', (e) => { if (e.target === scrim) close(); });
   $('.cp-x').addEventListener('click', () => close());
+  $('.cp-away').hidden = !awayCtl;
+  $('.cp-away').addEventListener('click', () => { awayCtl.toggle(); render(); });
   $$('[data-tab]').forEach((b) => b.addEventListener('click', () => { tab = b.dataset.tab; render(); }));
   $('.cp-reset').addEventListener('click', () => {
     if (confirm('Wipe every cigarette, pack and session from the ledger?')) { tracker.reset(); calc.perDay = calcV.perDay = null; render(true); }
@@ -462,6 +465,7 @@ export function createPanel(root, tracker, { onBrand } = {}) {
     const was = vape;
     vape = isVape(snap.brand);
     $('.cp-card').classList.toggle('cp-vape', vape);
+    if (awayCtl) $('.cp-away').textContent = awayCtl.get() ? 'Bring it back' : 'Put it away';
     if (was !== vape) full = true;
     $$('[data-tab]').forEach((b) => { b.classList.toggle('on', b.dataset.tab === tab); b.setAttribute('aria-selected', b.dataset.tab === tab); });
     renderBrands(snap); renderNumbers(snap); renderHistory(snap);
