@@ -185,7 +185,7 @@ export function createPanel(root, tracker, { onBrand } = {}) {
       <div class="cp-cols">
         <div>
           <section class="cp-panel"><h3>Contents</h3><table class="cp-tbl"></table></section>
-          <section class="cp-panel"><h3>Tar calculator</h3>
+          <section class="cp-panel"><h3 data-l="calc">Tar calculator</h3>
             <div class="cp-in">
               <label><span data-l="perDay">Cigs a day</span><input type="number" min="0" max="200" step="1" data-k="perDay"></label>
               <label>Years<input type="number" min="0" max="80" step="1" data-k="years"></label>
@@ -363,6 +363,7 @@ export function createPanel(root, tracker, { onBrand } = {}) {
     const snap = tracker.snapshot();
     $('[data-l="perDay"]').textContent = vape ? 'Puffs a day' : 'Cigs a day';
     $('[data-l="price"]').textContent = vape ? '$ a device' : '$ a pack';
+    $('[data-l="calc"]').textContent = vape ? 'Nicotine calculator' : 'Tar calculator';
     if (vape) return renderCalcVape(snap, fillInputs);
     const avg = avgPerDay(snap), mix = brandsUsed(snap);
     if (calc.perDay == null) calc.perDay = Math.max(1, Math.round(avg) || 10);
@@ -423,10 +424,14 @@ export function createPanel(root, tracker, { onBrand } = {}) {
     if (full) renderCalc(true);
   }
 
+  // Escape closes even when focus is still on the page behind the panel
+  function onEsc(e) { if (e.key === 'Escape') { e.stopPropagation(); close(); } }
+
   function open() {
     if (scrim.classList.contains('on')) return;
     clearInterval(timer);
     scrim.hidden = false; calc.perDay = calcV.perDay = null;
+    addEventListener('keydown', onEsc, true);
     render(true);
     requestAnimationFrame(() => scrim.classList.add('on'));
     timer = setInterval(() => render(false), 1000);
@@ -434,6 +439,7 @@ export function createPanel(root, tracker, { onBrand } = {}) {
   function close() {
     if (!scrim.classList.contains('on')) return;
     clearInterval(timer);
+    removeEventListener('keydown', onEsc, true);
     scrim.classList.remove('on');
     setTimeout(() => { if (!scrim.classList.contains('on')) scrim.hidden = true; }, 200);
   }

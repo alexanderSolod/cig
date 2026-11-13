@@ -124,9 +124,10 @@ export function mount() {
     chipAt = 0;
     if (mode) { vape.setDevice(id, tracker.puffsLeft(id)); if (!was) vape.show(); return; }
     vape.root.visible = false;
-    cig.setBrand(id); pack.swapTo(id, tracker.left(id));
-    if (was && (cig.state === 'out' || stage.target === 0)) relight();
-    else if (was && cig.state === 'fresh') cig.light();
+    cig.setBrand(id);
+    if (was && (cig.state === 'out' || stage.target === 0)) return relight();
+    pack.swapTo(id, tracker.left(id));
+    if (was && cig.state === 'fresh') cig.light();
   }
 
   const panel = createPanel(root, tracker, { onBrand: (id) => setBrand(id) });
@@ -195,7 +196,7 @@ export function mount() {
   // the stub shrinks away, the pack rises, flips open and hands over the next one
   let fading = false;
   function relight() {
-    if (fading || pack.busy) return;
+    if (fading || pack.anim?.kind === 'take') return;
     fading = true; stage.target = 0; packK.target = 1;
     const { left, opened } = tracker.take(tracker.cigBrand);
     pack.take({ left, refill: opened, brand: tracker.cigBrand, onOut: () => {

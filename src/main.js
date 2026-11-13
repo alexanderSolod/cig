@@ -101,10 +101,10 @@ addEventListener('wheel', (e) => {
 // the stub shrinks away, the pack opens and the next one slides out
 const stage = { k: 1, target: 1 };
 function takeNew() {
-  if (pack.busy) return;
+  if (pack.anim?.kind === 'take') return;
   stage.target = 0;
   const { left, opened } = tracker.take(tracker.cigBrand);
-  pack.take({ left, refill: opened, onOut: () => { cig.reset(); cig.setBrand(tracker.cigBrand); stage.target = 1; } });
+  pack.take({ left, refill: opened, brand: tracker.cigBrand, onOut: () => { cig.reset(); cig.setBrand(tracker.cigBrand); stage.target = 1; } });
 }
 function lightOrNew() { if (cig.state === 'fresh') cig.light(); else if (cig.state === 'out') takeNew(); }
 function setBrand(id) {
@@ -117,9 +117,9 @@ function setBrand(id) {
   } else {
     vape.root.visible = false;
     cig.setBrand(id);
-    pack.swapTo(id, tracker.left(id));
     pack.root.visible = true;
-    if (stage.target === 0 && !pack.busy) takeNew();
+    if (stage.target === 0) takeNew();                // nothing in hand yet: take one from this brand's pack
+    else pack.swapTo(id, tracker.left(id));
   }
   shown = ''; hudAt = 0;
 }
