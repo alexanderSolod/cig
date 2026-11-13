@@ -9,8 +9,8 @@ export const TIP = 3.0;      // tipping (cork) paper length
 export const END = TIP + 0.3; // burn stops here
 const PIVOT = 1.7;           // where the fingers would hold it; taps rotate about this
 const KEEP = 0.5;            // length of glowing coal left after ashing
-const IDLE_RATE = 0.0125;    // cm/s smoulder  (~7 min untouched)
-const DRAG_RATE = 0.22;      // extra cm/s at full inhale (~11 two-second drags)
+const IDLE_RATE = 0.0085;    // cm/s smoulder: ~10 min left untouched in an ashtray
+const DRAG_RATE = 0.0085;    // extra cm/s while drawing: ~5 min of steady scrolling, like a real cigarette (~10 puffs over ~5 min, NIDA)
 const SPIN = 0.2;            // idle yaw speed, rad/s
 const REST_TILT = 0.2;
 

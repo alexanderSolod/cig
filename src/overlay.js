@@ -17,7 +17,7 @@ const HIT_W = 230, HIT_H = 84;
 const LONG_PRESS = 550;               // ms
 const SAVE_KEY = 'cig:v1';
 const RESUME_WINDOW = 20 * 60e3;      // a lit cigarette left longer than this is gone
-const IDLE_RATE = 0.0125;             // keep in step with cigarette.js
+const IDLE_RATE = 0.0085;             // keep in step with cigarette.js
 
 const CSS = `
 :host { all: initial; }

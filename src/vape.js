@@ -6,8 +6,8 @@ import * as THREE from '../vendor/three/build/three.module.js';
 import { brand as getBrand } from './brands.js';
 
 export const W = 5.26, H = 8.26, D = 2.77;   // cm, Geek Bar Pulse is 52.6 × 82.6 × 27.7 mm
-export const BLINK_S = 5;                    // continuous draw before the blinker
-const GAP_S = 0.4;                           // a pause this long ends a draw
+export const BLINK_S = 8;                    // continuous draw before the auto cut-off (real puffs average ~3 s; disposables cut off around 8–10 s)
+const GAP_S = 0.9;                           // a pause this long ends a draw
 const HOLD_PX = 800;                         // px-equivalent per second while the Hit button is held
 const BEV = 0.42, CORNER = 0.55;
 const REST_YAW = 0.62;                       // screen side towards you

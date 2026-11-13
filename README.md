@@ -46,7 +46,7 @@ Then open:
   - Kretek Clove
 - **Geek Bar Pulse** (Fcuking Fab, Blue Razz Ice):
   - Scrolling is a draw. Stop and you exhale a GPU fluid-sim cloud across the screen, sized by how much you scrolled.
-  - Five seconds of non-stop scrolling hits a **blinker**: the screen flashes, it cuts off, and you get the biggest cloud.
+  - Eight seconds of non-stop scrolling hits a **blinker**: the screen flashes, it cuts off, and you get the biggest cloud.
   - 15,000 puffs a device, with battery and e-liquid on its screen.
 - **Stats screen**, laid out like the back of whichever pack you're holding (or styled like the Geek Bar's screen when you're vaping):
   - This session, today and all time
