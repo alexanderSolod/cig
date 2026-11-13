@@ -70,7 +70,8 @@ const CSS = `
 .cp-sw i{position:absolute;left:0;right:0;top:0;height:30%}
 .cp-sw b{position:absolute;left:4px;right:4px;bottom:4px;height:22%;background:#fff;outline:1.5px solid #000;outline-offset:-2px}
 .cp-brand{position:relative}
-.cp-pk{display:block;width:64px;height:84px}
+.cp-card canvas.cp-pk{display:block;position:static!important;inset:auto!important;width:64px!important;height:84px!important;opacity:1!important;
+  filter:none!important;-webkit-mask-image:none!important;mask-image:none!important;transition:none!important;cursor:inherit;touch-action:auto}
 .cp-left{position:absolute;top:4px;left:50%;transform:translate(-50%,-4px);opacity:0;transition:opacity .15s ease,transform .15s ease;pointer-events:none;
   background:#151515;color:#fff;font:700 10px/1 "Helvetica Neue",Arial,sans-serif;padding:4px 6px;border-radius:2px;white-space:nowrap}
 .cp-brand:hover .cp-left,.cp-brand:focus-visible .cp-left{opacity:1;transform:translate(-50%,0)}
